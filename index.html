@@ -946,15 +946,15 @@
         const colorThemeSelect = document.getElementById('color-theme');
         const customColorsSection = document.getElementById('custom-colors');
         
-        // Simplified tab switching function
+        // Tab switching function - FIXED VERSION
         function switchTab(tabName) {
             // Hide all tab contents
-            document.querySelectorAll('.tab-content').forEach(content => {
+            tabContents.forEach(content => {
                 content.classList.remove('active');
             });
             
             // Deactivate all tabs
-            document.querySelectorAll('.tab').forEach(tab => {
+            tabs.forEach(tab => {
                 tab.classList.remove('active');
             });
             
@@ -2052,10 +2052,10 @@
         
         // Setup event listeners
         function setupEventListeners() {
-            // Tab switching - NEW SIMPLIFIED VERSION
+            // Tab switching - FIXED VERSION
             document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const tabName = tab.getAttribute('data-tab');
+                tab.addEventListener('click', (e) => {
+                    const tabName = e.target.getAttribute('data-tab');
                     switchTab(tabName);
                 });
             });
@@ -2643,7 +2643,7 @@
                     
                     const filteredCourses = courseId === 'all' 
                         ? appData.courses 
-                        : appData.courses.filter(c => c.id === parseInt(courseId)));
+                        : appData.courses.filter(c => c.id === parseInt(courseId));
                     
                     filteredCourses.forEach(course => {
                         reportContent += `<h5>${course.code} - ${course.name}</h5>';
