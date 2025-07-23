@@ -413,8 +413,21 @@
                     </select>
                 </div>
                 
-                <div class="grid" id="student-grid">
-                    <!-- Student cards will be inserted here -->
+                <div id="students-table-container">
+                    <table id="students-table">
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Courses Enrolled</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Filled by JavaScript -->
+                        </tbody>
+                    </table>
                 </div>
                 
                 <button class="btn" id="add-student-btn">Add New Student</button>
@@ -839,7 +852,7 @@
         const courseModal = document.getElementById('course-modal');
         const unitModal = document.getElementById('unit-modal');
         const studentDetailModal = document.getElementById('student-detail-modal');
-        const studentGrid = document.getElementById('student-grid');
+        const studentsTable = document.getElementById('students-table');
         const coursesTable = document.getElementById('courses-table');
         const recentActivityTable = document.getElementById('recent-activity');
         const unitManagement = document.getElementById('unit-management');
@@ -979,9 +992,10 @@
             return Math.floor(Math.random() * totalWeeks) + 1;
         }
         
-        // Render students
+        // Render students in table format with edit/delete buttons
         function renderStudents(filter = '') {
-            studentGrid.innerHTML = '';
+            const tbody = studentsTable.querySelector('tbody');
+            tbody.innerHTML = '';
             
             const courseFilter = document.getElementById('course-filter').value;
             const statusFilter = document.getElementById('status-filter').value;
@@ -1023,9 +1037,9 @@
                     if (!matchesStatus) return;
                 }
                 
-                const card = document.createElement('div');
-                card.className = 'student-card';
+                const row = document.createElement('tr');
                 
+                // Calculate overall progress
                 let overallProgress = 0;
                 let totalCourses = 0;
                 let status = 'on-track';
@@ -1055,33 +1069,25 @@
                 
                 overallProgress = totalCourses > 0 ? Math.round(overallProgress / totalCourses) : 0;
                 
-                card.innerHTML = `
-                    <div class="student-name">${student.firstName} ${student.lastName}</div>
-                    <div>Enrolled in ${student.courses.length} course(s)</div>
-                    <div style="margin: 10px 0;">
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Progress:</span>
-                            <span>${overallProgress}%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress" style="width: ${overallProgress}%"></div>
-                        </div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="badge ${getStatusBadgeClass(status)}">${formatStatus(status)}</span>
-                        <button class="btn" data-student-id="${student.id}">View Details</button>
-                    </div>
+                // Get enrolled courses names
+                const enrolledCourses = student.courses.map(courseId => {
+                    const course = appData.courses.find(c => c.id === courseId);
+                    return course ? course.code : '';
+                }).filter(name => name).join(', ');
+                
+                row.innerHTML = `
+                    <td>${student.id}</td>
+                    <td>${student.firstName} ${student.lastName}</td>
+                    <td>${student.email || 'N/A'}</td>
+                    <td>${enrolledCourses}</td>
+                    <td>
+                        <button class="btn" data-student-id="${student.id}" data-action="edit">Edit</button>
+                        <button class="btn btn-danger" data-student-id="${student.id}" data-action="delete">Delete</button>
+                        <button class="btn" data-student-id="${student.id}" data-action="view">View</button>
+                    </td>
                 `;
                 
-                studentGrid.appendChild(card);
-            });
-            
-            // Add click event to view buttons
-            document.querySelectorAll('.student-card button').forEach(button => {
-                button.addEventListener('click', () => {
-                    const studentId = parseInt(button.getAttribute('data-student-id'));
-                    showStudentDetails(studentId);
-                });
+                tbody.appendChild(row);
             });
         }
         
@@ -1677,6 +1683,22 @@
             });
         }
         
+        // Delete student
+        function deleteStudent(studentId) {
+            if (confirm('Are you sure you want to delete this student? This will remove all their progress data.')) {
+                // Remove student from students array
+                appData.students = appData.students.filter(s => s.id !== studentId);
+                
+                // Remove student from activity log
+                appData.activityLog = appData.activityLog.filter(activity => activity.studentId !== studentId);
+                
+                saveData();
+                renderStudents();
+                renderDashboard();
+                renderRecentActivity();
+            }
+        }
+        
         // Delete course
         function deleteCourse(courseId) {
             if (confirm('Are you sure you want to delete this course? This will also remove all associated units, tasks, and student progress data.')) {
@@ -1755,6 +1777,22 @@
                 studentModal.style.display = 'none';
             });
             
+            // Student table actions
+            document.getElementById('students-table').addEventListener('click', e => {
+                if (e.target.tagName === 'BUTTON') {
+                    const studentId = parseInt(e.target.getAttribute('data-student-id'));
+                    const action = e.target.getAttribute('data-action');
+                    
+                    if (action === 'edit') {
+                        showStudentModal(studentId);
+                    } else if (action === 'delete') {
+                        deleteStudent(studentId);
+                    } else if (action === 'view') {
+                        showStudentDetails(studentId);
+                    }
+                }
+            });
+            
             document.getElementById('student-form').addEventListener('submit', e => {
                 e.preventDefault();
                 
@@ -1827,6 +1865,15 @@
                     });
                     
                     student.courses = selectedCourses;
+                    
+                    // Log activity
+                    appData.activityLog.unshift({
+                        date: new Date().toISOString().split('T')[0],
+                        studentId: student.id,
+                        courseId: null,
+                        activity: 'Student information updated',
+                        status: 'info'
+                    });
                 } else {
                     // Add new student
                     const newStudent = {
