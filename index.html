@@ -327,38 +327,6 @@
             transform: rotate(-90deg);
         }
         
-        .unit-selector {
-            display: flex;
-            flex-direction: column;
-            max-height: 300px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        
-        .unit-selector-item {
-            display: flex;
-            align-items: center;
-            padding: 5px 0;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .unit-selector-item:last-child {
-            border-bottom: none;
-        }
-        
-        .unit-selector-item input {
-            width: auto;
-            margin-right: 10px;
-        }
-        
-        .unit-type-badge {
-            margin-left: 10px;
-            font-size: 0.8em;
-        }
-        
         @media (max-width: 768px) {
             .search-filter {
                 flex-direction: column;
@@ -574,7 +542,6 @@
                         <button class="btn" id="export-data-btn">Export Data</button>
                         <button class="btn btn-warning" id="import-data-btn">Import Data</button>
                         <input type="file" id="import-file" style="display: none;" accept=".json">
-                        <button class="btn btn-danger" id="reset-data-btn">Reset Data</button>
                     </div>
                 </div>
                 
@@ -640,14 +607,6 @@
                     <label for="course-description">Description</label>
                     <textarea id="course-description" rows="3"></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Course Type</label>
-                    <select id="course-type" class="form-control">
-                        <option value="classroom">Classroom-based</option>
-                        <option value="workplace">Workplace-based</option>
-                        <option value="both">Both (Classroom and Workplace)</option>
-                    </select>
-                </div>
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" class="btn btn-danger" id="cancel-course-btn">Cancel</button>
                     <button type="submit" class="btn btn-success">Save</button>
@@ -677,13 +636,6 @@
                 <div class="form-group">
                     <label for="unit-order">Order in Course</label>
                     <input type="number" id="unit-order" min="1" required>
-                </div>
-                <div class="form-group">
-                    <label>Unit Type</label>
-                    <select id="unit-type" class="form-control">
-                        <option value="core">Core Unit (Required)</option>
-                        <option value="elective">Elective Unit (Optional)</option>
-                    </select>
                 </div>
                 <div class="form-group">
                     <label>Assessment Tasks</label>
@@ -725,19 +677,6 @@
         </div>
     </div>
     
-    <div id="student-units-modal" class="modal" style="display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
-        <div style="background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 600px;">
-            <h2 id="student-units-title">Assign Units</h2>
-            <div id="student-units-content">
-                <!-- Filled by JavaScript -->
-            </div>
-            <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
-                <button type="button" class="btn btn-danger" id="cancel-student-units-btn">Cancel</button>
-                <button type="button" class="btn btn-success" id="save-student-units-btn">Save</button>
-            </div>
-        </div>
-    </div>
-    
     <script>
         // Sample data structure with enhanced unit and task tracking
         let appData = {
@@ -758,10 +697,6 @@
                     email: "john.smith@example.com",
                     phone: "0412345678",
                     courses: [1, 2],
-                    enrolledUnits: {
-                        1: [1, 2], // Course ID: [unit IDs]
-                        2: [1]
-                    },
                     progress: {
                         1: { 
                             units: {
@@ -811,9 +746,6 @@
                     email: "sarah.j@example.com",
                     phone: "0423456789",
                     courses: [1],
-                    enrolledUnits: {
-                        1: [1, 2]
-                    },
                     progress: {
                         1: { 
                             units: {
@@ -850,7 +782,6 @@
                     name: "Certificate III in Information Technology",
                     duration: 12,
                     description: "This qualification provides the skills and knowledge for an individual to be competent in a wide range of general information and communications technology (ICT) technical functions.",
-                    type: "both", // classroom, workplace, or both
                     units: [
                         { 
                             id: 1, 
@@ -858,7 +789,6 @@
                             name: "ICT Fundamentals", 
                             order: 1, 
                             description: "Introduction to ICT concepts and principles",
-                            type: "core", // core or elective
                             tasks: [
                                 { id: 1, name: "Written Assessment" },
                                 { id: 2, name: "Practical Demonstration" },
@@ -873,26 +803,12 @@
                             name: "Networking Basics", 
                             order: 2, 
                             description: "Fundamentals of computer networking",
-                            type: "core",
                             tasks: [
                                 { id: 1, name: "Written Assessment" },
                                 { id: 2, name: "Practical Demonstration" },
                                 { id: 3, name: "Project Work" },
                                 { id: 4, name: "Oral Presentation" },
                                 { id: 5, name: "Portfolio" }
-                            ]
-                        },
-                        { 
-                            id: 3, 
-                            code: "WEB201",
-                            name: "Web Development", 
-                            order: 3, 
-                            description: "Introduction to web development",
-                            type: "elective",
-                            tasks: [
-                                { id: 1, name: "Website Project" },
-                                { id: 2, name: "Code Review" },
-                                { id: 3, name: "Documentation" }
                             ]
                         }
                     ]
@@ -903,7 +819,6 @@
                     name: "Certificate IV in Business",
                     duration: 10,
                     description: "This qualification reflects the role of individuals who use well-developed skills and a broad knowledge base in a wide variety of contexts.",
-                    type: "classroom",
                     units: [
                         { 
                             id: 1, 
@@ -911,7 +826,6 @@
                             name: "Business Communication", 
                             order: 1, 
                             description: "Effective communication in business contexts",
-                            type: "core",
                             tasks: [
                                 { id: 1, name: "Written Report" },
                                 { id: 2, name: "Role Play" },
@@ -938,30 +852,12 @@
         const courseModal = document.getElementById('course-modal');
         const unitModal = document.getElementById('unit-modal');
         const studentDetailModal = document.getElementById('student-detail-modal');
-        const studentUnitsModal = document.getElementById('student-units-modal');
         const studentsTable = document.getElementById('students-table');
         const coursesTable = document.getElementById('courses-table');
         const recentActivityTable = document.getElementById('recent-activity');
         const unitManagement = document.getElementById('unit-management');
         const colorThemeSelect = document.getElementById('color-theme');
         const customColorsSection = document.getElementById('custom-colors');
-        
-        // Tab switching function - FIXED VERSION
-        function switchTab(tabName) {
-            // Hide all tab contents
-            tabContents.forEach(content => {
-                content.classList.remove('active');
-            });
-            
-            // Deactivate all tabs
-            tabs.forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Activate selected tab and content
-            document.getElementById(tabName).classList.add('active');
-            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
-        }
         
         // Initialize the app
         function initApp() {
@@ -971,20 +867,13 @@
             renderCourses();
             renderRecentActivity();
             setupEventListeners();
-            
-            // Start with dashboard tab active
-            switchTab('dashboard');
         }
         
         // Load settings from localStorage or use defaults
         function loadSettings() {
             const savedData = localStorage.getItem('vocationalProgressTracker');
             if (savedData) {
-                try {
-                    appData = JSON.parse(savedData);
-                } catch (e) {
-                    console.error("Error parsing saved data, using defaults", e);
-                }
+                appData = JSON.parse(savedData);
             }
             
             // Apply settings
@@ -1195,7 +1084,6 @@
                         <button class="btn" data-student-id="${student.id}" data-action="edit">Edit</button>
                         <button class="btn btn-danger" data-student-id="${student.id}" data-action="delete">Delete</button>
                         <button class="btn" data-student-id="${student.id}" data-action="view">View</button>
-                        <button class="btn" data-student-id="${student.id}" data-action="units">Units</button>
                     </td>
                 `;
                 
@@ -1426,12 +1314,7 @@
                 
                 // Render units for this course
                 const unitsContainer = document.getElementById(`course-units-${course.id}`);
-                
-                // Only show units the student is enrolled in
-                const enrolledUnitIds = student.enrolledUnits[course.id] || [];
-                const enrolledUnits = course.units.filter(unit => enrolledUnitIds.includes(unit.id));
-                
-                enrolledUnits.sort((a, b) => a.order - b.order).forEach(unit => {
+                course.units.sort((a, b) => a.order - b.order).forEach(unit => {
                     const unitProgress = courseProgress.units[unit.id] || { completedTasks: 0, totalTasks: unit.tasks.length };
                     const unitStatus = getUnitStatus(student, course.id, unit.id);
                     const unitTasksCompleted = unitProgress.completedTasks;
@@ -1447,7 +1330,6 @@
                             <div>
                                 <strong>${unit.code} - ${unit.name}</strong>
                                 <span class="badge ${getStatusBadgeClass(unitStatus)}" style="margin-left: 10px;">${formatStatus(unitStatus)}</span>
-                                ${unit.type === 'elective' ? '<span class="badge badge-info unit-type-badge">Elective</span>' : ''}
                             </div>
                             <div>
                                 ${unitTasksCompleted}/${unitTotalTasks} tasks
@@ -1501,9 +1383,9 @@
                                     newStatus = 'completed';
                                     break;
                                 case 'completed':
-                                    newStatus = 'partial';
+                                    newStatus = 'partially-completed';
                                     break;
-                                case 'partial':
+                                case 'partially-completed':
                                     newStatus = 'failed';
                                     break;
                                 case 'failed':
@@ -1566,154 +1448,6 @@
             });
             
             studentDetailModal.style.display = 'block';
-        }
-        
-        // Show student units modal
-        function showStudentUnitsModal(studentId) {
-            const student = appData.students.find(s => s.id === studentId);
-            if (!student) return;
-            
-            document.getElementById('student-units-title').textContent = `Assign Units for ${student.firstName} ${student.lastName}`;
-            const content = document.getElementById('student-units-content');
-            content.innerHTML = '';
-            
-            student.courses.forEach(courseId => {
-                const course = appData.courses.find(c => c.id === courseId);
-                if (!course) return;
-                
-                const courseDiv = document.createElement('div');
-                courseDiv.className = 'card';
-                courseDiv.style.marginBottom = '15px';
-                courseDiv.innerHTML = `
-                    <h3>${course.code} - ${course.name}</h3>
-                    <p>Select units for this student:</p>
-                    <div class="unit-selector" id="unit-selector-${course.id}">
-                        <!-- Units will be inserted here -->
-                    </div>
-                `;
-                
-                content.appendChild(courseDiv);
-                
-                const unitSelector = document.getElementById(`unit-selector-${course.id}`);
-                
-                // Get currently enrolled units for this course
-                const enrolledUnitIds = student.enrolledUnits[course.id] || [];
-                
-                // Separate core and elective units
-                const coreUnits = course.units.filter(u => u.type === 'core');
-                const electiveUnits = course.units.filter(u => u.type === 'elective');
-                
-                // Add core units section (required)
-                if (coreUnits.length > 0) {
-                    const coreHeader = document.createElement('h4');
-                    coreHeader.textContent = 'Core Units (Required)';
-                    unitSelector.appendChild(coreHeader);
-                    
-                    coreUnits.sort((a, b) => a.order - b.order).forEach(unit => {
-                        const unitItem = document.createElement('div');
-                        unitItem.className = 'unit-selector-item';
-                        unitItem.innerHTML = `
-                            <input type="checkbox" id="unit-${course.id}-${unit.id}" 
-                                data-course-id="${course.id}" data-unit-id="${unit.id}" 
-                                checked disabled>
-                            <label for="unit-${course.id}-${unit.id}">
-                                ${unit.code} - ${unit.name}
-                                <span class="badge badge-info">Core</span>
-                            </label>
-                        `;
-                        unitSelector.appendChild(unitItem);
-                    });
-                }
-                
-                // Add elective units section (optional)
-                if (electiveUnits.length > 0) {
-                    const electiveHeader = document.createElement('h4');
-                    electiveHeader.textContent = 'Elective Units (Optional)';
-                    unitSelector.appendChild(electiveHeader);
-                    
-                    electiveUnits.sort((a, b) => a.order - b.order).forEach(unit => {
-                        const unitItem = document.createElement('div');
-                        unitItem.className = 'unit-selector-item';
-                        unitItem.innerHTML = `
-                            <input type="checkbox" id="unit-${course.id}-${unit.id}" 
-                                data-course-id="${course.id}" data-unit-id="${unit.id}"
-                                ${enrolledUnitIds.includes(unit.id) ? 'checked' : ''}>
-                            <label for="unit-${course.id}-${unit.id}">
-                                ${unit.code} - ${unit.name}
-                                <span class="badge">Elective</span>
-                            </label>
-                        `;
-                        unitSelector.appendChild(unitItem);
-                    });
-                }
-            });
-            
-            // Set up save button
-            document.getElementById('save-student-units-btn').onclick = function() {
-                // Reset all enrolled units
-                student.enrolledUnits = {};
-                
-                // Get all checked unit checkboxes
-                const checkedUnits = content.querySelectorAll('input[type="checkbox"]:checked');
-                
-                checkedUnits.forEach(checkbox => {
-                    const courseId = parseInt(checkbox.getAttribute('data-course-id'));
-                    const unitId = parseInt(checkbox.getAttribute('data-unit-id'));
-                    
-                    if (!student.enrolledUnits[courseId]) {
-                        student.enrolledUnits[courseId] = [];
-                    }
-                    
-                    student.enrolledUnits[courseId].push(unitId);
-                });
-                
-                // Initialize progress for newly assigned units
-                for (const courseId in student.enrolledUnits) {
-                    if (!student.progress[courseId]) {
-                        student.progress[courseId] = { units: {}, lastActivity: null };
-                    }
-                    
-                    if (!student.taskStatus[courseId]) {
-                        student.taskStatus[courseId] = {};
-                    }
-                    
-                    const course = appData.courses.find(c => c.id == courseId);
-                    if (course) {
-                        student.enrolledUnits[courseId].forEach(unitId => {
-                            const unit = course.units.find(u => u.id == unitId);
-                            if (unit) {
-                                // Initialize progress if not exists
-                                if (!student.progress[courseId].units[unitId]) {
-                                    student.progress[courseId].units[unitId] = {
-                                        completedTasks: 0,
-                                        totalTasks: unit.tasks.length
-                                    };
-                                }
-                                
-                                // Initialize task status if not exists
-                                if (!student.taskStatus[courseId][unitId]) {
-                                    student.taskStatus[courseId][unitId] = {};
-                                    unit.tasks.forEach(task => {
-                                        student.taskStatus[courseId][unitId][task.id] = 'not-started';
-                                    });
-                                }
-                            }
-                        });
-                    }
-                }
-                
-                saveData();
-                studentUnitsModal.style.display = 'none';
-                renderStudents();
-                renderDashboard();
-            };
-            
-            // Set up cancel button
-            document.getElementById('cancel-student-units-btn').onclick = function() {
-                studentUnitsModal.style.display = 'none';
-            };
-            
-            studentUnitsModal.style.display = 'block';
         }
         
         function getUnitStatus(student, courseId, unitId) {
@@ -1798,13 +1532,11 @@
                 document.getElementById('course-name').value = course.name;
                 document.getElementById('course-duration').value = course.duration;
                 document.getElementById('course-description').value = course.description || '';
-                document.getElementById('course-type').value = course.type || 'classroom';
             } else {
                 // Add mode
                 title.textContent = 'Add New Course';
                 form.reset();
                 document.getElementById('course-id').value = '';
-                document.getElementById('course-type').value = 'classroom';
             }
             
             courseModal.style.display = 'block';
@@ -1832,7 +1564,6 @@
                 document.getElementById('unit-name').value = unit.name;
                 document.getElementById('unit-description').value = unit.description || '';
                 document.getElementById('unit-order').value = unit.order;
-                document.getElementById('unit-type').value = unit.type || 'core';
                 
                 // Populate task fields
                 taskFields.innerHTML = '';
@@ -1853,7 +1584,6 @@
                 form.reset();
                 document.getElementById('unit-id').value = '';
                 document.getElementById('unit-order').value = (appData.courses.find(c => c.id === courseId)?.units.length || 0) + 1;
-                document.getElementById('unit-type').value = 'core';
                 
                 // Add default empty task field
                 taskFields.innerHTML = '';
@@ -1898,14 +1628,12 @@
             
             unitManagement.innerHTML = `
                 <h3>${course.code} - ${course.name}</h3>
-                <p>Course type: ${formatCourseType(course.type)}</p>
                 <table>
                     <thead>
                         <tr>
                             <th>Order</th>
                             <th>Unit Code</th>
                             <th>Unit Name</th>
-                            <th>Type</th>
                             <th>Tasks</th>
                             <th>Actions</th>
                         </tr>
@@ -1924,7 +1652,6 @@
                     <td>${unit.order}</td>
                     <td>${unit.code}</td>
                     <td>${unit.name}</td>
-                    <td>${unit.type === 'core' ? 'Core' : 'Elective'}</td>
                     <td>${unit.tasks.length}</td>
                     <td>
                         <button class="btn" data-unit-id="${unit.id}" data-course-id="${courseId}" data-action="edit-unit">Edit</button>
@@ -1954,15 +1681,6 @@
             document.getElementById('add-unit-btn').addEventListener('click', () => {
                 showUnitModal(courseId);
             });
-        }
-        
-        function formatCourseType(type) {
-            switch(type) {
-                case 'classroom': return 'Classroom-based';
-                case 'workplace': return 'Workplace-based';
-                case 'both': return 'Classroom and Workplace';
-                default: return type;
-            }
         }
         
         // Delete student
@@ -2000,11 +1718,6 @@
                     if (student.taskStatus[courseId]) {
                         delete student.taskStatus[courseId];
                     }
-                    
-                    // Remove enrolled units for this course
-                    if (student.enrolledUnits[courseId]) {
-                        delete student.enrolledUnits[courseId];
-                    }
                 });
                 
                 saveData();
@@ -2024,14 +1737,9 @@
                     
                     // Update student progress to reflect removed unit
                     appData.students.forEach(student => {
-                        if (student.courses.includes(courseId)) {
-                            // Remove unit from enrolled units
-                            if (student.enrolledUnits[courseId]) {
-                                student.enrolledUnits[courseId] = student.enrolledUnits[courseId].filter(id => id !== unitId);
-                            }
-                            
+                        if (student.courses.includes(courseId) && student.progress[courseId]) {
                             // Remove unit progress
-                            if (student.progress[courseId]?.units[unitId]) {
+                            if (student.progress[courseId].units[unitId]) {
                                 delete student.progress[courseId].units[unitId];
                             }
                             
@@ -2052,11 +1760,14 @@
         
         // Setup event listeners
         function setupEventListeners() {
-            // Tab switching - FIXED VERSION
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', (e) => {
-                    const tabName = e.target.getAttribute('data-tab');
-                    switchTab(tabName);
+            // Tab switching
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab).classList.add('active');
                 });
             });
             
@@ -2078,8 +1789,6 @@
                         deleteStudent(studentId);
                     } else if (action === 'view') {
                         showStudentDetails(studentId);
-                    } else if (action === 'units') {
-                        showStudentUnitsModal(studentId);
                     }
                 }
             });
@@ -2143,23 +1852,16 @@
                                         }
                                     });
                                 });
-                                
-                                // Initialize enrolled units - include all core units by default
-                                if (!student.enrolledUnits[courseId]) {
-                                    student.enrolledUnits[courseId] = course.units
-                                        .filter(u => u.type === 'core')
-                                        .map(u => u.id);
-                                }
                             }
                         }
                     });
                     
                     // Remove progress for unselected courses
-                    const removedCourses = student.courses.filter(cId => !selectedCourses.includes(cId));
-                    removedCourses.forEach(courseId => {
-                        delete student.progress[courseId];
-                        delete student.taskStatus[courseId];
-                        delete student.enrolledUnits[courseId];
+                    student.courses.forEach(courseId => {
+                        if (!selectedCourses.includes(courseId)) {
+                            delete student.progress[courseId];
+                            delete student.taskStatus[courseId];
+                        }
                     });
                     
                     student.courses = selectedCourses;
@@ -2182,8 +1884,7 @@
                         phone,
                         courses: selectedCourses,
                         progress: {},
-                        taskStatus: {},
-                        enrolledUnits: {}
+                        taskStatus: {}
                     };
                     
                     // Initialize progress for each course
@@ -2193,28 +1894,18 @@
                             newStudent.progress[courseId] = { units: {}, lastActivity: null };
                             newStudent.taskStatus[courseId] = {};
                             
-                            // Initialize unit progress - include all core units by default
-                            newStudent.enrolledUnits[courseId] = course.units
-                                .filter(u => u.type === 'core')
-                                .map(u => u.id);
-                            
-                            // Initialize progress for enrolled units
-                            newStudent.enrolledUnits[courseId].forEach(unitId => {
-                                const unit = course.units.find(u => u.id === unitId);
-                                if (unit) {
-                                    newStudent.progress[courseId].units[unitId] = {
-                                        completedTasks: 0,
-                                        totalTasks: unit.tasks.length
-                                    };
-                                    
-                                    // Initialize task status
-                                    if (!newStudent.taskStatus[courseId][unitId]) {
-                                        newStudent.taskStatus[courseId][unitId] = {};
-                                        unit.tasks.forEach(task => {
-                                            newStudent.taskStatus[courseId][unitId][task.id] = 'not-started';
-                                        });
-                                    }
-                                }
+                            // Initialize unit progress
+                            course.units.forEach(unit => {
+                                newStudent.progress[courseId].units[unit.id] = {
+                                    completedTasks: 0,
+                                    totalTasks: unit.tasks.length
+                                };
+                                
+                                // Initialize task status
+                                newStudent.taskStatus[courseId][unit.id] = {};
+                                unit.tasks.forEach(task => {
+                                    newStudent.taskStatus[courseId][unit.id][task.id] = 'not-started';
+                                });
                             });
                         }
                     });
@@ -2268,7 +1959,6 @@
                 const name = document.getElementById('course-name').value.trim();
                 const duration = parseInt(document.getElementById('course-duration').value);
                 const description = document.getElementById('course-description').value.trim();
-                const type = document.getElementById('course-type').value;
                 
                 if (courseId) {
                     // Update existing course
@@ -2278,7 +1968,6 @@
                         course.name = name;
                         course.duration = duration;
                         course.description = description;
-                        course.type = type;
                     }
                 } else {
                     // Add new course
@@ -2288,7 +1977,6 @@
                         name,
                         duration,
                         description,
-                        type,
                         units: []
                     };
                     
@@ -2316,7 +2004,6 @@
                 const name = document.getElementById('unit-name').value.trim();
                 const description = document.getElementById('unit-description').value.trim();
                 const order = parseInt(document.getElementById('unit-order').value);
-                const type = document.getElementById('unit-type').value;
                 
                 // Get tasks from form
                 const taskInputs = document.querySelectorAll('#task-fields input');
@@ -2336,34 +2023,30 @@
                         unit.name = name;
                         unit.description = description;
                         unit.order = order;
-                        unit.type = type;
                         unit.tasks = tasks;
                         
                         // Update student progress to reflect task changes
                         appData.students.forEach(student => {
                             if (student.courses.includes(courseId) && student.progress[courseId]) {
-                                // Only update if student is enrolled in this unit
-                                if (student.enrolledUnits[courseId]?.includes(unit.id)) {
-                                    // Update unit progress
-                                    if (student.progress[courseId].units[unit.id]) {
-                                        student.progress[courseId].units[unit.id].totalTasks = tasks.length;
-                                        
-                                        // If student had completed more tasks than now exist, adjust completed count
-                                        if (student.progress[courseId].units[unit.id].completedTasks > tasks.length) {
-                                            student.progress[courseId].units[unit.id].completedTasks = tasks.length;
-                                        }
-                                    }
+                                // Update unit progress
+                                if (student.progress[courseId].units[unit.id]) {
+                                    student.progress[courseId].units[unit.id].totalTasks = tasks.length;
                                     
-                                    // Update task status
-                                    if (student.taskStatus[courseId]?.[unit.id]) {
-                                        // Keep only statuses for tasks that still exist
-                                        const newTaskStatus = {};
-                                        tasks.forEach((task, index) => {
-                                            const oldTaskId = parseInt(taskInputs[index].getAttribute('data-task-id')) || task.id;
-                                            newTaskStatus[task.id] = student.taskStatus[courseId][unit.id][oldTaskId] || 'not-started';
-                                        });
-                                        student.taskStatus[courseId][unit.id] = newTaskStatus;
+                                    // If student had completed more tasks than now exist, adjust completed count
+                                    if (student.progress[courseId].units[unit.id].completedTasks > tasks.length) {
+                                        student.progress[courseId].units[unit.id].completedTasks = tasks.length;
                                     }
+                                }
+                                
+                                // Update task status
+                                if (student.taskStatus[courseId]?.[unit.id]) {
+                                    // Keep only statuses for tasks that still exist
+                                    const newTaskStatus = {};
+                                    tasks.forEach((task, index) => {
+                                        const oldTaskId = parseInt(taskInputs[index].getAttribute('data-task-id')) || task.id;
+                                        newTaskStatus[task.id] = student.taskStatus[courseId][unit.id][oldTaskId] || 'not-started';
+                                    });
+                                    student.taskStatus[courseId][unit.id] = newTaskStatus;
                                 }
                             }
                         });
@@ -2376,45 +2059,35 @@
                         name,
                         description,
                         order,
-                        type,
                         tasks
                     };
                     
                     course.units.push(newUnit);
                     
                     // Update student progress for students enrolled in this course
-                    // Core units are automatically enrolled, elective units are optional
-                    if (type === 'core') {
-                        appData.students.forEach(student => {
-                            if (student.courses.includes(courseId)) {
-                                // Initialize progress for this unit
-                                if (!student.progress[courseId]) {
-                                    student.progress[courseId] = { units: {}, lastActivity: null };
-                                }
-                                
-                                student.progress[courseId].units[newUnit.id] = {
-                                    completedTasks: 0,
-                                    totalTasks: tasks.length
-                                };
-                                
-                                // Initialize task status for this unit
-                                if (!student.taskStatus[courseId]) {
-                                    student.taskStatus[courseId] = {};
-                                }
-                                
-                                student.taskStatus[courseId][newUnit.id] = {};
-                                tasks.forEach(task => {
-                                    student.taskStatus[courseId][newUnit.id][task.id] = 'not-started';
-                                });
-                                
-                                // Add to enrolled units
-                                if (!student.enrolledUnits[courseId]) {
-                                    student.enrolledUnits[courseId] = [];
-                                }
-                                student.enrolledUnits[courseId].push(newUnit.id);
+                    appData.students.forEach(student => {
+                        if (student.courses.includes(courseId)) {
+                            // Initialize progress for this unit
+                            if (!student.progress[courseId]) {
+                                student.progress[courseId] = { units: {}, lastActivity: null };
                             }
-                        });
-                    }
+                            
+                            student.progress[courseId].units[newUnit.id] = {
+                                completedTasks: 0,
+                                totalTasks: tasks.length
+                            };
+                            
+                            // Initialize task status for this unit
+                            if (!student.taskStatus[courseId]) {
+                                student.taskStatus[courseId] = {};
+                            }
+                            
+                            student.taskStatus[courseId][newUnit.id] = {};
+                            tasks.forEach(task => {
+                                student.taskStatus[courseId][newUnit.id][task.id] = 'not-started';
+                            });
+                        }
+                    });
                 }
                 
                 saveData();
@@ -2529,14 +2202,6 @@
                 e.target.value = '';
             });
             
-            // Reset data button
-            document.getElementById('reset-data-btn').addEventListener('click', function() {
-                if (confirm('Are you sure you want to reset all data? This cannot be undone.')) {
-                    localStorage.removeItem('vocationalProgressTracker');
-                    location.reload(); // Refresh to load default data
-                }
-            });
-            
             // Generate report
             document.getElementById('generate-report-btn').addEventListener('click', function() {
                 const reportType = document.getElementById('report-type').value;
@@ -2646,7 +2311,7 @@
                         : appData.courses.filter(c => c.id === parseInt(courseId));
                     
                     filteredCourses.forEach(course => {
-                        reportContent += `<h5>${course.code} - ${course.name}</h5>';
+                        reportContent += `<h5>${course.code} - ${course.name}</h5>`;
                         
                         course.units.sort((a, b) => a.order - b.order).forEach(unit => {
                             reportContent += `<h6>${unit.code} - ${unit.name}</h6>`;
@@ -2659,23 +2324,19 @@
                                 let failed = 0;
                                 
                                 appData.students.forEach(student => {
-                                    if (student.courses.includes(course.id) && 
-                                        student.enrolledUnits[course.id]?.includes(unit.id)) {
+                                    if (student.courses.includes(course.id)) {
                                         const status = student.taskStatus[course.id]?.[unit.id]?.[task.id] || 'not-started';
                                         
                                         switch(status) {
                                             case 'completed': completed++; break;
                                             case 'not-started': notStarted++; break;
-                                            case 'partial': partial++; break;
+                                            case 'partially-completed': partial++; break;
                                             case 'failed': failed++; break;
                                         }
                                     }
                                 });
                                 
-                                const totalStudents = appData.students.filter(s => 
-                                    s.courses.includes(course.id) && 
-                                    s.enrolledUnits[course.id]?.includes(unit.id)
-                                ).length;
+                                const totalStudents = appData.students.filter(s => s.courses.includes(course.id)).length;
                                 
                                 reportContent += `
                                     <tr>
