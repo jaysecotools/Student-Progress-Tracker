@@ -946,6 +946,23 @@
         const colorThemeSelect = document.getElementById('color-theme');
         const customColorsSection = document.getElementById('custom-colors');
         
+        // Simplified tab switching function
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Activate selected tab and content
+            document.getElementById(tabName).classList.add('active');
+            document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+        }
+        
         // Initialize the app
         function initApp() {
             loadSettings();
@@ -954,6 +971,9 @@
             renderCourses();
             renderRecentActivity();
             setupEventListeners();
+            
+            // Start with dashboard tab active
+            switchTab('dashboard');
         }
         
         // Load settings from localStorage or use defaults
@@ -2032,17 +2052,11 @@
         
         // Setup event listeners
         function setupEventListeners() {
-            // Tab switching
-            tabs.forEach(tab => {
+            // Tab switching - NEW SIMPLIFIED VERSION
+            document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', () => {
-                    // Remove active class from all tabs and tab contents
-                    tabs.forEach(t => t.classList.remove('active'));
-                    tabContents.forEach(c => c.classList.remove('active'));
-                    
-                    // Add active class to clicked tab and corresponding content
-                    tab.classList.add('active');
-                    const tabId = tab.getAttribute('data-tab');
-                    document.getElementById(tabId).classList.add('active');
+                    const tabName = tab.getAttribute('data-tab');
+                    switchTab(tabName);
                 });
             });
             
@@ -2632,7 +2646,7 @@
                         : appData.courses.filter(c => c.id === parseInt(courseId)));
                     
                     filteredCourses.forEach(course => {
-                        reportContent += `<h5>${course.code} - ${course.name}</h5>`;
+                        reportContent += `<h5>${course.code} - ${course.name}</h5>';
                         
                         course.units.sort((a, b) => a.order - b.order).forEach(unit => {
                             reportContent += `<h6>${unit.code} - ${unit.name}</h6>`;
