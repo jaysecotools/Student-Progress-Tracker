@@ -1047,10 +1047,12 @@
             document.getElementById('at-risk').textContent = atRisk;
         }
         
-        function getWeeksElapsed(totalWeeks, lastActivityDate) {
-            // Simplified calculation - in a real app, you'd use actual dates
-            return Math.floor(Math.random() * totalWeeks) + 1;
-        }
+function getWeeksElapsed(totalWeeks, lastActivityDate) {
+  const startDate = new Date(/* course start date */); // You need to track this
+  const endDate = lastActivityDate ? new Date(lastActivityDate) : new Date();
+  const msPerWeek = 1000 * 60 * 60 * 24 * 7;
+  return Math.floor((endDate - startDate) / msPerWeek);
+}
         
         // Render students in table format with edit/delete buttons
         function renderStudents(filter = '') {
