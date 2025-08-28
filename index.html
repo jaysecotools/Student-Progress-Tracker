@@ -987,6 +987,24 @@
             renderCourses();
             renderRecentActivity();
             setupEventListeners();
+            
+            // Initialize report filters
+            const reportCourseSelect = document.getElementById('report-course');
+            reportCourseSelect.innerHTML = '<option value="all">All Courses</option>';
+            appData.courses?.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.id;
+                option.textContent = `${course.code} - ${course.name}`;
+                reportCourseSelect.appendChild(option);
+            });
+            
+            // Set default date range (last 30 days)
+            const today = new Date();
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(today.getDate() - 30);
+            
+            document.getElementById('report-start-date').value = thirtyDaysAgo.toISOString().split('T')[0];
+            document.getElementById('report-end-date').value = today.toISOString().split('T')[0];
         }
 
         // Backfill start dates for existing courses
@@ -2259,6 +2277,244 @@
             }
         }
         
+        // Report generation functions
+        function generateReport() {
+            try {
+                const reportType = document.getElementById('report-type').value;
+                const courseId = document.getElementById('report-course').value;
+                const startDate = document.getElementById('report-start-date').value;
+                const endDate = document.getElementById('report-end-date').value;
+                
+                let reportContent = '<h3>Report Results</h3>';
+                
+                // Filter activities by date range if provided
+                let filteredActivities = [...appData.activityLog];
+                if (startDate) {
+                    filteredActivities = filteredActivities.filter(a => a.date >= startDate);
+                }
+                if (endDate) {
+                    filteredActivities = filteredActivities.filter(a => a.date <= endDate);
+                }
+                
+                if (reportType === 'completion') {
+                    reportContent += generateCompletionReport(courseId);
+                } else if (reportType === 'progress') {
+                    reportContent += generateProgressReport(courseId);
+                } else if (reportType === 'attendance') {
+                    reportContent += generateAttendanceReport(filteredActivities, courseId);
+                } else if (reportType === 'task-completion') {
+                    reportContent += generateTaskCompletionReport(courseId);
+                } else if (reportType === 'custom') {
+                    reportContent += generateCustomReport();
+                }
+                
+                document.getElementById('report-results').innerHTML = reportContent;
+            } catch (e) {
+                console.error('Error generating report:', e);
+                document.getElementById('report-results').innerHTML = 
+                    '<div class="alert alert-danger">Error generating report: ' + e.message + '</div>';
+            }
+        }
+        
+        function generateCompletionReport(courseId) {
+            let content = '<h4>Course Completion Report</h4>';
+            
+            const filteredCourses = courseId === 'all' 
+                ? appData.courses 
+                : appData.courses.filter(c => c.id === parseInt(courseId));
+            
+            filteredCourses.forEach(course => {
+                const enrolledStudents = appData.students.filter(student => 
+                    student.courses.some(c => c.courseId === course.id)
+                );
+                
+                let completed = 0;
+                enrolledStudents.forEach(student => {
+                    const courseProgress = student.progress[course.id];
+                    if (courseProgress) {
+                        let allUnitsCompleted = true;
+                        for (const unitId in courseProgress.units) {
+                            const unitProgress = courseProgress.units[unitId];
+                            if (unitProgress.completedTasks < unitProgress.totalTasks) {
+                                allUnitsCompleted = false;
+                                break;
+                            }
+                        }
+                        if (allUnitsCompleted) completed++;
+                    }
+                });
+                
+                const completionRate = enrolledStudents.length > 0 
+                    ? Math.round((completed / enrolledStudents.length) * 100) 
+                    : 0;
+                
+                content += `
+                    <div class="card" style="margin-bottom: 15px;">
+                        <h5>${course.code} - ${course.name}</h5>
+                        <p>Enrolled: ${enrolledStudents.length} | Completed: ${completed} (${completionRate}%)</p>
+                        <div class="progress-bar">
+                            <div class="progress" style="width: ${completionRate}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            return content;
+        }
+        
+        function generateProgressReport(courseId) {
+            let content = '<h4>Student Progress Report</h4>';
+            
+            const filteredStudents = courseId === 'all'
+                ? appData.students
+                : appData.students.filter(student => student.courses.some(c => c.courseId === parseInt(courseId)));
+            
+            content += '<table><thead><tr><th>Student</th><th>Course</th><th>Progress</th><th>Status</th></tr></thead><tbody>';
+            
+            filteredStudents.forEach(student => {
+                const relevantCourses = courseId === 'all'
+                    ? student.courses.map(c => appData.courses.find(course => course.id === c.courseId)).filter(Boolean)
+                    : [appData.courses.find(c => c.id === parseInt(courseId))].filter(Boolean);
+                
+                relevantCourses.forEach(course => {
+                    const courseProgress = student.progress[course.id] || { units: {} };
+                    let totalTasksCompleted = 0;
+                    let totalTasks = 0;
+                    
+                    for (const unitId in courseProgress.units) {
+                        totalTasksCompleted += courseProgress.units[unitId].completedTasks || 0;
+                        totalTasks += courseProgress.units[unitId].totalTasks || 0;
+                    }
+                    
+                    const progressPercentage = totalTasks > 0 ? Math.round((totalTasksCompleted / totalTasks) * 100) : 0;
+                    const status = getStudentStatus(student, course.id);
+                    
+                    content += `
+                        <tr>
+                            <td>${student.firstName} ${student.lastName}</td>
+                            <td>${course.code}</td>
+                            <td>
+                                ${totalTasksCompleted} of ${totalTasks} (${progressPercentage}%)
+                                <div class="progress-bar">
+                                    <div class="progress" style="width: ${progressPercentage}%"></div>
+                                </div>
+                            </td>
+                            <td><span class="badge ${getStatusBadgeClass(status)}">${formatStatus(status)}</span></td>
+                        </tr>
+                    `;
+                });
+            });
+            
+            content += '</tbody></table>';
+            return content;
+        }
+        
+        function generateTaskCompletionReport(courseId) {
+            let content = '<h4>Task Completion Report</h4>';
+            
+            const filteredCourses = courseId === 'all' 
+                ? appData.courses 
+                : appData.courses.filter(c => c.id === parseInt(courseId));
+            
+            filteredCourses.forEach(course => {
+                content += `<h5>${course.code} - ${course.name}</h5>`;
+                
+                course.units.sort((a, b) => a.order - b.order).forEach(unit => {
+                    content += `<h6>${unit.code} - ${unit.name}</h6>`;
+                    content += '<table><thead><tr><th>Task</th><th>Completed</th><th>Not Started</th><th>Partially Completed</th><th>Failed</th></tr></thead><tbody>';
+                    
+                    unit.tasks.forEach(task => {
+                        let completed = 0;
+                        let notStarted = 0;
+                        let partial = 0;
+                        let failed = 0;
+                        
+                        appData.students.forEach(student => {
+                            const courseObj = student.courses.find(c => c.courseId === course.id);
+                            if (courseObj && courseObj.units.includes(unit.id)) {
+                                const status = student.taskStatus[course.id][unit.id][task.id] || 'not-started';
+                                
+                                switch(status) {
+                                    case 'completed': completed++; break;
+                                    case 'not-started': notStarted++; break;
+                                    case 'partial': partial++; break;
+                                    case 'failed': failed++; break;
+                                }
+                            }
+                        });
+                        
+                        const totalStudents = appData.students.filter(s => 
+                            s.courses.some(c => c.courseId === course.id && c.units.includes(unit.id))
+                        ).length;
+                        
+                        content += `
+                            <tr>
+                                <td>${task.name}</td>
+                                <td>${completed} (${totalStudents > 0 ? Math.round((completed / totalStudents) * 100) : 0}%)</td>
+                                <td>${notStarted} (${totalStudents > 0 ? Math.round((notStarted / totalStudents) * 100) : 0}%)</td>
+                                <td>${partial} (${totalStudents > 0 ? Math.round((partial / totalStudents) * 100) : 0}%)</td>
+                                <td>${failed} (${totalStudents > 0 ? Math.round((failed / totalStudents) * 100) : 0}%)</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    content += '</tbody></table>';
+                });
+            });
+            
+            return content;
+        }
+        
+        function generateAttendanceReport(activities, courseId) {
+            let content = '<h4>Attendance Report</h4>';
+            
+            // Filter activities by course if specified
+            let filteredActivities = activities;
+            if (courseId !== 'all') {
+                filteredActivities = activities.filter(a => a.courseId === parseInt(courseId));
+            }
+            
+            if (filteredActivities.length === 0) {
+                content += '<p>No activities found for the selected criteria.</p>';
+                return content;
+            }
+            
+            content += '<table><thead><tr><th>Date</th><th>Student</th><th>Course</th><th>Activity</th><th>Status</th></tr></thead><tbody>';
+            
+            filteredActivities.forEach(activity => {
+                const student = appData.students.find(s => s.id === activity.studentId);
+                const course = appData.courses.find(c => c.id === activity.courseId);
+                
+                if (student && course) {
+                    content += `
+                        <tr>
+                            <td>${activity.date}</td>
+                            <td>${student.firstName} ${student.lastName}</td>
+                            <td>${course.code}</td>
+                            <td>${activity.activity}</td>
+                            <td><span class="badge ${getStatusBadgeClass(activity.status)}">${formatStatus(activity.status)}</span></td>
+                        </tr>
+                    `;
+                }
+            });
+            
+            content += '</tbody></table>';
+            return content;
+        }
+        
+        function generateCustomReport() {
+            return `
+                <h4>Custom Report</h4>
+                <p>Custom reports can be developed based on your specific needs.</p>
+                <p>Available data points:</p>
+                <ul>
+                    <li>Total students: ${appData.students.length}</li>
+                    <li>Total courses: ${appData.courses.length}</li>
+                    <li>Total activities logged: ${appData.activityLog.length}</li>
+                </ul>
+            `;
+        }
+        
         // Setup event listeners
         function setupEventListeners() {
             try {
@@ -2858,173 +3114,7 @@
                 });
                 
                 // Generate report
-                document.getElementById('generate-report-btn').addEventListener('click', function() {
-                    try {
-                        const reportType = document.getElementById('report-type').value;
-                        const courseId = document.getElementById('report-course').value;
-                        const startDate = document.getElementById('report-start-date').value;
-                        const endDate = document.getElementById('report-end-date').value;
-                        
-                        let reportContent = '<h3>Report Results</h3>';
-                        
-                        if (reportType === 'completion') {
-                            reportContent += '<h4>Course Completion Report</h4>';
-                            
-                            const filteredCourses = courseId === 'all' 
-                                ? appData.courses 
-                                : appData.courses.filter(c => c.id === parseInt(courseId));
-                            
-                            filteredCourses?.forEach(course => {
-                                const enrolledStudents = appData.students?.filter(student => 
-                                    student.courses?.some(c => c.courseId === course.id)
-                                );
-                                
-                                let completed = 0;
-                                enrolledStudents?.forEach(student => {
-                                    let allUnitsCompleted = true;
-                                    const courseProgress = student.progress?.[course.id];
-                                    
-                                    if (courseProgress) {
-                                        for (const unitId in courseProgress.units || {}) {
-                                            const unitProgress = courseProgress.units[unitId];
-                                            if (unitProgress.completedTasks < unitProgress.totalTasks) {
-                                                allUnitsCompleted = false;
-                                                break;
-                                            }
-                                        }
-                                    } else {
-                                        allUnitsCompleted = false;
-                                    }
-                                    
-                                    if (allUnitsCompleted) {
-                                        completed++;
-                                    }
-                                });
-                                
-                                const completionRate = enrolledStudents?.length > 0 
-                                    ? Math.round((completed / enrolledStudents.length) * 100) 
-                                    : 0;
-                                
-                                reportContent += `
-                                    <div class="card" style="margin-bottom: 15px;">
-                                        <h5>${course.code} - ${course.name}</h5>
-                                        <p>Enrolled: ${enrolledStudents?.length || 0} | Completed: ${completed} (${completionRate}%)</p>
-                                        <div class="progress-bar">
-                                            <div class="progress" style="width: ${completionRate}%"></div>
-                                        </div>
-                                    </div>
-                                `;
-                            });
-                        } else if (reportType === 'progress') {
-                            reportContent += '<h4>Student Progress Report</h4>';
-                            
-                            const filteredStudents = courseId === 'all'
-                                ? appData.students
-                                : appData.students.filter(student => student.courses?.some(c => c.courseId === parseInt(courseId)));
-                            
-                            reportContent += '<table><thead><tr><th>Student</th><th>Course</th><th>Progress</th><th>Status</th></tr></thead><tbody>';
-                            
-                            filteredStudents?.forEach(student => {
-                                const relevantCourses = courseId === 'all'
-                                    ? student.courses?.map(c => appData.courses?.find(course => course.id === c.courseId)).filter(Boolean)
-                                    : [appData.courses?.find(c => c.id === parseInt(courseId))].filter(Boolean);
-                                
-                                relevantCourses?.forEach(course => {
-                                    const courseProgress = student.progress?.[course.id] || { units: {} };
-                                    let totalTasksCompleted = 0;
-                                    let totalTasks = 0;
-                                    
-                                    for (const unitId in courseProgress.units || {}) {
-                                        totalTasksCompleted += courseProgress.units[unitId]?.completedTasks || 0;
-                                        totalTasks += courseProgress.units[unitId]?.totalTasks || 0;
-                                    }
-                                    
-                                    const progressPercentage = totalTasks > 0 ? Math.round((totalTasksCompleted / totalTasks) * 100) : 0;
-                                    const status = getStudentStatus(student, course.id);
-                                    
-                                    reportContent += `
-                                        <tr>
-                                            <td>${student.firstName} ${student.lastName}</td>
-                                            <td>${course.code}</td>
-                                            <td>
-                                                ${totalTasksCompleted} of ${totalTasks} (${progressPercentage}%)
-                                                <div class="progress-bar">
-                                                    <div class="progress" style="width: ${progressPercentage}%"></div>
-                                                </div>
-                                            </td>
-                                            <td><span class="badge ${getStatusBadgeClass(status)}">${formatStatus(status)}</span></td>
-                                        </tr>
-                                    `;
-                                });
-                            });
-                            
-                            reportContent += '</tbody></table>';
-                        } else if (reportType === 'task-completion') {
-                            reportContent += '<h4>Task Completion Report</h4>';
-                            
-                            const filteredCourses = courseId === 'all' 
-                                ? appData.courses 
-                                : appData.courses.filter(c => c.id === parseInt(courseId));
-                            
-                            filteredCourses?.forEach(course => {
-                                reportContent += `<h5>${course.code} - ${course.name}</h5>`;
-                                
-                                course.units?.sort((a, b) => a.order - b.order).forEach(unit => {
-                                    reportContent += `<h6>${unit.code} - ${unit.name}</h6>`;
-                                    reportContent += '<table><thead><tr><th>Task</th><th>Completed</th><th>Not Started</th><th>Partially Completed</th><th>Failed</th></tr></thead><tbody>';
-                                    
-                                    unit.tasks?.forEach(task => {
-                                        let completed = 0;
-                                        let notStarted = 0;
-                                        let partial = 0;
-                                        let failed = 0;
-                                        
-                                        appData.students?.forEach(student => {
-                                            const courseObj = student.courses?.find(c => c.courseId === course.id);
-                                            if (courseObj && courseObj.units?.includes(unit.id)) {
-                                                const status = student.taskStatus?.[course.id]?.[unit.id]?.[task.id] || 'not-started';
-                                                
-                                                switch(status) {
-                                                    case 'completed': completed++; break;
-                                                    case 'not-started': notStarted++; break;
-                                                    case 'partial': partial++; break;
-                                                    case 'failed': failed++; break;
-                                                }
-                                            }
-                                        });
-                                        
-                                        const totalStudents = appData.students?.filter(s => 
-                                            s.courses?.some(c => c.courseId === course.id && c.units?.includes(unit.id))
-                                        ).length || 0;
-                                        
-                                        reportContent += `
-                                            <tr>
-                                                <td>${task.name}</td>
-                                                <td>${completed} (${totalStudents > 0 ? Math.round((completed / totalStudents) * 100) : 0}%)</td>
-                                                <td>${notStarted} (${totalStudents > 0 ? Math.round((notStarted / totalStudents) * 100) : 0}%)</td>
-                                                <td>${partial} (${totalStudents > 0 ? Math.round((partial / totalStudents) * 100) : 0}%)</td>
-                                                <td>${failed} (${totalStudents > 0 ? Math.round((failed / totalStudents) * 100) : 0}%)</td>
-                                            </tr>
-                                        `;
-                                    });
-                                    
-                                    reportContent += '</tbody></table>';
-                                });
-                            });
-                        } else if (reportType === 'attendance') {
-                            reportContent += '<h4>Attendance Report</h4>';
-                            reportContent += '<p>Attendance tracking would be implemented based on your specific requirements.</p>';
-                        } else if (reportType === 'custom') {
-                            reportContent += '<h4>Custom Report</h4>';
-                            reportContent += '<p>Custom reports can be developed based on your specific needs.</p>';
-                        }
-                        
-                        document.getElementById('report-results').innerHTML = reportContent;
-                    } catch (e) {
-                        console.error('Error generating report:', e);
-                        document.getElementById('report-results').innerHTML = '<div class="alert alert-danger">Error generating report</div>';
-                    }
-                });
+                document.getElementById('generate-report-btn').addEventListener('click', generateReport);
             } catch (e) {
                 console.error('Error setting up event listeners:', e);
             }
@@ -3035,3 +3125,4 @@
     </script>
 </body>
 </html>
+                                        
