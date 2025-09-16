@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vocational Education Progress Tracker</title>
+    <!-- Add Chart.js library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
             --primary-color: #4a6fa5;
@@ -295,7 +297,7 @@
         .task-status {
             width: 20px;
             height: 20px;
-            border-radius: 50%;
+            borderRadius: 50%;
             border: 2px solid #ddd;
             cursor: pointer;
         }
@@ -376,6 +378,62 @@
             cursor: pointer;
         }
         
+        /* New styles for chart toggle and charts */
+        .chart-toggle-container {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+        
+        .chart-toggle-btn {
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .chart-toggle-btn.active {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+        
+        .chart-toggle-btn:first-child {
+            border-radius: 4px 0 0 4px;
+        }
+        
+        .chart-toggle-btn:last-child {
+            border-radius: 0 4px 4px 0;
+        }
+        
+        .charts-container {
+            display: none;
+        }
+        
+        .charts-container.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .chart-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+        
         @media (max-width: 768px) {
             .search-filter {
                 flex-direction: column;
@@ -388,6 +446,14 @@
             .modal-content {
                 width: 90%;
                 margin: 10% auto;
+            }
+            
+            .charts-container.active {
+                grid-template-columns: 1fr;
+            }
+            
+            .chart-toggle-container {
+                justify-content: center;
             }
         }
     </style>
@@ -411,8 +477,18 @@
         
         <div id="dashboard" class="tab-content active">
             <div class="card">
+                <div class="chart-toggle-container">
+                    <button class="chart-toggle-btn active" id="cards-view-btn">
+                        <i class="fas fa-th-large"></i> Cards View
+                    </button>
+                    <button class="chart-toggle-btn" id="charts-view-btn">
+                        <i class="fas fa-chart-bar"></i> Charts View
+                    </button>
+                </div>
+                
                 <h2>Overview</h2>
-                <div class="grid">
+                
+                <div class="grid" id="cards-view">
                     <div class="card">
                         <h3>Total Students</h3>
                         <p id="total-students">0</p>
@@ -428,6 +504,33 @@
                     <div class="card">
                         <h3>At Risk Students</h3>
                         <p id="at-risk">0</p>
+                    </div>
+                </div>
+                
+                <div class="charts-container" id="charts-view">
+                    <div class="chart-card">
+                        <h3>Student Distribution</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="student-distribution-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Course Progress</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="course-progress-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Status Overview</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="status-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Monthly Activity</h3>
+                        <div class="chart-wrapper">
+                            <canvas id="activity-chart"></canvas>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -964,6 +1067,12 @@
             ]
         };
         
+        // Chart instances
+        let studentDistributionChart = null;
+        let courseProgressChart = null;
+        let statusChart = null;
+        let activityChart = null;
+        
         // DOM elements
         const tabs = document.querySelectorAll('.tab');
         const tabContents = document.querySelectorAll('.tab-content');
@@ -1157,6 +1266,11 @@
                 });
                 
                 document.getElementById('at-risk').textContent = atRisk;
+                
+                // Update charts if they are visible
+                if (document.getElementById('charts-view').classList.contains('active')) {
+                    updateCharts();
+                }
             } catch (e) {
                 console.error('Error rendering dashboard:', e);
             }
@@ -2515,6 +2629,245 @@
             `;
         }
         
+        // Update charts with current data
+        function updateCharts() {
+            // Destroy existing charts if they exist
+            if (studentDistributionChart) {
+                studentDistributionChart.destroy();
+            }
+            if (courseProgressChart) {
+                courseProgressChart.destroy();
+            }
+            if (statusChart) {
+                statusChart.destroy();
+            }
+            if (activityChart) {
+                activityChart.destroy();
+            }
+            
+            // Student Distribution Chart
+            const studentDistributionCtx = document.getElementById('student-distribution-chart').getContext('2d');
+            const courseEnrollments = {};
+            
+            appData.students.forEach(student => {
+                student.courses.forEach(course => {
+                    if (!courseEnrollments[course.courseId]) {
+                        courseEnrollments[course.courseId] = 0;
+                    }
+                    courseEnrollments[course.courseId]++;
+                });
+            });
+            
+            const courseLabels = [];
+            const enrollmentData = [];
+            
+            appData.courses.forEach(course => {
+                courseLabels.push(course.name);
+                enrollmentData.push(courseEnrollments[course.id] || 0);
+            });
+            
+            studentDistributionChart = new Chart(studentDistributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: courseLabels,
+                    datasets: [{
+                        data: enrollmentData,
+                        backgroundColor: [
+                            '#4a6fa5', '#166088', '#4fc3f7', '#28a745', '#ffc107',
+                            '#dc3545', '#6f42c1', '#e83e8c', '#20c997', '#fd7e14'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Students per Course'
+                        }
+                    }
+                }
+            });
+            
+            // Course Progress Chart
+            const courseProgressCtx = document.getElementById('course-progress-chart').getContext('2d');
+            const progressData = [];
+            
+            appData.courses.forEach(course => {
+                let totalProgress = 0;
+                let studentCount = 0;
+                
+                appData.students.forEach(student => {
+                    if (student.courses.some(c => c.courseId === course.id)) {
+                        const courseProgress = student.progress[course.id] || { units: {} };
+                        let tasksCompleted = 0;
+                        let totalTasks = 0;
+                        
+                        for (const unitId in courseProgress.units) {
+                            tasksCompleted += courseProgress.units[unitId].completedTasks || 0;
+                            totalTasks += courseProgress.units[unitId].totalTasks || 0;
+                        }
+                        
+                        if (totalTasks > 0) {
+                            totalProgress += (tasksCompleted / totalTasks) * 100;
+                            studentCount++;
+                        }
+                    }
+                });
+                
+                progressData.push(studentCount > 0 ? Math.round(totalProgress / studentCount) : 0);
+            });
+            
+            courseProgressChart = new Chart(courseProgressCtx, {
+                type: 'bar',
+                data: {
+                    labels: courseLabels,
+                    datasets: [{
+                        label: 'Average Progress (%)',
+                        data: progressData,
+                        backgroundColor: '#4a6fa5'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Average Course Progress'
+                        }
+                    }
+                }
+            });
+            
+            // Status Overview Chart
+            const statusCtx = document.getElementById('status-chart').getContext('2d');
+            const statusCounts = {
+                'on-track': 0,
+                'behind': 0,
+                'at-risk': 0,
+                'completed': 0
+            };
+            
+            appData.students.forEach(student => {
+                let studentStatus = 'completed';
+                
+                for (const courseObj of student.courses) {
+                    const status = getStudentStatus(student, courseObj.courseId);
+                    if (status === 'at-risk') {
+                        studentStatus = 'at-risk';
+                        break;
+                    } else if (status === 'behind' && studentStatus !== 'at-risk') {
+                        studentStatus = 'behind';
+                    } else if (status === 'on-track' && studentStatus === 'completed') {
+                        studentStatus = 'on-track';
+                    }
+                }
+                
+                statusCounts[studentStatus]++;
+            });
+            
+            statusChart = new Chart(statusCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['On Track', 'Behind', 'At Risk', 'Completed'],
+                    datasets: [{
+                        data: [
+                            statusCounts['on-track'],
+                            statusCounts['behind'],
+                            statusCounts['at-risk'],
+                            statusCounts['completed']
+                        ],
+                        backgroundColor: [
+                            '#28a745', // On Track - green
+                            '#ffc107', // Behind - yellow
+                            '#dc3545', // At Risk - red
+                            '#4a6fa5'  // Completed - blue
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        title: {
+                            display: true,
+                            text: 'Student Status Overview'
+                        }
+                    }
+                }
+            });
+            
+            // Monthly Activity Chart
+            const activityCtx = document.getElementById('activity-chart').getContext('2d');
+            const monthlyActivity = {};
+            
+            // Initialize with empty months
+            const last6Months = [];
+            const today = new Date();
+            for (let i = 5; i >= 0; i--) {
+                const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+                const monthYear = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+                last6Months.push(monthYear);
+                monthlyActivity[monthYear] = 0;
+            }
+            
+            // Count activities by month
+            appData.activityLog.forEach(activity => {
+                const date = new Date(activity.date);
+                const monthYear = date.toLocaleString('default', { month: 'short', year: 'numeric' });
+                
+                if (monthlyActivity[monthYear] !== undefined) {
+                    monthlyActivity[monthYear]++;
+                }
+            });
+            
+            const activityData = last6Months.map(month => monthlyActivity[month]);
+            
+            activityChart = new Chart(activityCtx, {
+                type: 'line',
+                data: {
+                    labels: last6Months,
+                    datasets: [{
+                        label: 'Activities',
+                        data: activityData,
+                        borderColor: '#4a6fa5',
+                        backgroundColor: 'rgba(74, 111, 165, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Monthly Activity Trend'
+                        }
+                    }
+                }
+            });
+        }
+        
         // Setup event listeners
         function setupEventListeners() {
             try {
@@ -2543,6 +2896,24 @@
                         tab.classList.add('active');
                         document.getElementById(tab.dataset.tab).classList.add('active');
                     });
+                });
+                
+                // Chart toggle functionality
+                document.getElementById('cards-view-btn').addEventListener('click', function() {
+                    this.classList.add('active');
+                    document.getElementById('charts-view-btn').classList.remove('active');
+                    document.getElementById('cards-view').style.display = 'grid';
+                    document.getElementById('charts-view').classList.remove('active');
+                });
+                
+                document.getElementById('charts-view-btn').addEventListener('click', function() {
+                    this.classList.add('active');
+                    document.getElementById('cards-view-btn').classList.remove('active');
+                    document.getElementById('cards-view').style.display = 'none';
+                    document.getElementById('charts-view').classList.add('active');
+                    
+                    // Update charts with current data
+                    updateCharts();
                 });
                 
                 // Student modal
@@ -3125,4 +3496,3 @@
     </script>
 </body>
 </html>
-                                        
