@@ -6,6 +6,7 @@
     <title>Vocational Education Progress Tracker</title>
     <!-- Add Chart.js library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --primary-color: #4a6fa5;
@@ -87,6 +88,24 @@
             padding: 4px 8px;
             font-size: 12px;
         }
+        
+        .help-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--accent-color);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.help-btn:hover {
+    background: var(--secondary-color);
+    color: white;
+}
         
         table {
             width: 100%;
@@ -460,14 +479,20 @@
             }
         }
     </style>
-</head>
-<body>
-    <header>
-        <div class="container">
-            <h1>Vocational Education Progress Tracker</h1>
-            <p>Monitor and manage student progress through certificate courses</p>
+<header>
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>Vocational Education Progress Tracker</h1>
+                <p>Monitor and manage student progress through certificate courses</p>
+            </div>
+            <!-- ADD THIS BUTTON -->
+            <a href="UserGuide.html" class="help-btn">
+                <i class="fas fa-question-circle"></i> Help Guide
+            </a>
         </div>
-    </header>
+    </div>
+</header>
     
     <div class="container">
         <div class="tabs">
