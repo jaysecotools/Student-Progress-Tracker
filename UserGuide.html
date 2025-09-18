@@ -1,1 +1,748 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocational Education Progress Tracker - User Guide</title>
+    <style>
+        :root {
+            --primary-color: #4a6fa5;
+            --secondary-color: #166088;
+            --accent-color: #4fc3f7;
+            --light-color: #f8f9fa;
+            --dark-color: #343a40;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: var(--dark-color);
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 30px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        h1, h2, h3, h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        h1 {
+            border-bottom: 2px solid var(--secondary-color);
+            padding-bottom: 15px;
+        }
+        
+        h2 {
+            border-left: 5px solid var(--primary-color);
+            padding-left: 15px;
+            margin-top: 40px;
+        }
+        
+        h3 {
+            color: var(--secondary-color);
+            margin-top: 30px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+        
+        .toc {
+            background-color: var(--light-color);
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .toc ul {
+            columns: 2;
+            padding-left: 20px;
+        }
+        
+        .toc li {
+            margin-bottom: 8px;
+            break-inside: avoid;
+        }
+        
+        .toc a {
+            color: var(--secondary-color);
+            text-decoration: none;
+        }
+        
+        .toc a:hover {
+            text-decoration: underline;
+            color: var(--primary-color);
+        }
+        
+        .note {
+            background-color: #e8f4fd;
+            border-left: 4px solid var(--accent-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            border-left: 4px solid var(--warning-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .important {
+            background-color: #f8d7da;
+            border-left: 4px solid var(--danger-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .screenshot {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 4px;
+            margin: 15px 0;
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .feature-block {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            align-items: flex-start;
+        }
+        
+        .feature-icon {
+            font-size: 24px;
+            color: var(--primary-color);
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .feature-content {
+            flex: 1;
+        }
+        
+        .step {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .step-number {
+            display: inline-block;
+            background: var(--success-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            margin-right: 10px;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            border-left: 4px solid var(--secondary-color);
+        }
+        
+        .back-to-top {
+            text-align: right;
+            margin-top: 30px;
+        }
+        
+        .back-to-top a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        @media (max-width: 768px) {
+            .toc ul {
+                columns: 1;
+            }
+            
+            .feature-block {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Vocational Education Progress Tracker</h1>
+            <p>Complete User Guide & Documentation</p>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <h2>Introduction</h2>
+            <p>The <strong>Vocational Education Progress Tracker</strong> is a web-based application designed for educators and administrators to monitor and manage student progress through certificate-based courses. It provides a centralized platform to track individual student task completion, manage course structures, visualize overall progress, identify at-risk students, and generate detailed reports.</p>
+            
+            <div class="note">
+                <strong>Important Note:</strong> This application runs entirely in your web browser. Your data is saved to your browser's local storage. To prevent data loss, regularly use the <strong>Export Data</strong> function in the Settings tab to create a backup file.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Table of Contents</h2>
+            <div class="toc">
+                <ul>
+                    <li><a href="#getting-started">1. Getting Started</a></li>
+                    <li><a href="#dashboard">2. Dashboard</a>
+                        <ul>
+                            <li><a href="#overview-cards">Overview Cards</a></li>
+                            <li><a href="#charts-view">Charts View</a></li>
+                            <li><a href="#recent-activity">Recent Activity</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#students-module">3. Students Module</a>
+                        <ul>
+                            <li><a href="#viewing-students">Viewing & Filtering Students</a></li>
+                            <li><a href="#adding-student">Adding a New Student</a></li>
+                            <li><a href="#editing-student">Editing a Student</a></li>
+                            <li><a href="#student-details">Viewing Student Details & Updating Progress</a></li>
+                            <li><a href="#deleting-student">Deleting a Student</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#courses-module">4. Courses Module</a>
+                        <ul>
+                            <li><a href="#viewing-courses">Viewing Courses</a></li>
+                            <li><a href="#adding-course">Adding a New Course</a></li>
+                            <li><a href="#editing-course">Editing a Course</a></li>
+                            <li><a href="#managing-units">Managing Course Units</a></li>
+                            <li><a href="#deleting-course">Deleting a Course</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#reports-module">5. Reports Module</a>
+                        <ul>
+                            <li><a href="#generating-reports">Generating Reports</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#settings-module">6. Settings Module</a>
+                        <ul>
+                            <li><a href="#app-settings">Application Settings</a></li>
+                            <li><a href="#data-management">Data Management</a></li>
+                        </ul>
+                    </li>
+                    <li><a href="#troubleshooting">7. Troubleshooting</a></li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="getting-started">1. Getting Started</h2>
+            
+            <div class="feature-block">
+                <div class="feature-icon">🚀</div>
+                <div class="feature-content">
+                    <h3>Launching the Application</h3>
+                    <p>To begin using the Progress Tracker, simply open the <code>index.html</code> file in any modern web browser (Chrome, Firefox, Edge, or Safari). The application will load immediately with sample data to help you explore its features.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">🧭</div>
+                <div class="feature-content">
+                    <h3>Navigation</h3>
+                    <p>Use the tabs at the top of the page to navigate between the different modules of the application:</p>
+                    <ul>
+                        <li><strong>Dashboard</strong> - Overview of key metrics and recent activity</li>
+                        <li><strong>Students</strong> - Manage student records and progress</li>
+                        <li><strong>Courses</strong> - Set up and manage course structures</li>
+                        <li><strong>Reports</strong> - Generate detailed progress reports</li>
+                        <li><strong>Settings</strong> - Configure application preferences and manage data</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="note">
+                <strong>Tip:</strong> The application comes pre-loaded with sample data for two students and two courses. You can use this to explore features before entering your own data.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="dashboard">2. Dashboard</h2>
+            <p>The Dashboard provides a high-level overview of your institution's activity and performance.</p>
+            
+            <h3 id="overview-cards">Overview Cards</h3>
+            <p>The default view shows four key metrics cards:</p>
+            
+            <div class="feature-block">
+                <div class="feature-icon">👥</div>
+                <div class="feature-content">
+                    <h4>Total Students</h4>
+                    <p>The current number of students in the system.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">📚</div>
+                <div class="feature-content">
+                    <h4>Active Courses</h4>
+                    <p>The number of courses that have been created.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">✅</div>
+                <div class="feature-content">
+                    <h4>Completion Rate</h4>
+                    <p>The percentage of students who have completed <em>all tasks</em> in <em>all</em> their enrolled courses.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">⚠️</div>
+                <div class="feature-content">
+                    <h4>At Risk Students</h4>
+                    <p>The number of students who are significantly behind the expected progress timeline in any of their courses.</p>
+                </div>
+            </div>
+            
+            <h3 id="charts-view">Charts View</h3>
+            <p>Click the <strong>"Charts View"</strong> button to toggle from cards to visual data representations:</p>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Click the "Charts View" button in the top right of the Dashboard card.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                Explore the four different charts that appear:
+            </div>
+            
+            <ul>
+                <li><strong>Student Distribution:</strong> A doughnut chart showing how students are distributed across different courses.</li>
+                <li><strong>Course Progress:</strong> A bar chart showing the average percentage of tasks completed for each course.</li>
+                <li><strong>Status Overview:</strong> A pie chart showing the proportion of students who are On Track, Behind, At Risk, or have Completed all courses.</li>
+                <li><strong>Monthly Activity:</strong> A line graph showing the number of logged activities (task updates) over the past six months.</li>
+            </ul>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Click the "Cards View" button to return to the metrics cards.
+            </div>
+            
+            <h3 id="recent-activity">Recent Activity</h3>
+            <p>This table logs the five most recent actions performed in the system, including:</p>
+            <ul>
+                <li>Task completions or status changes</li>
+                <li>Student additions or edits</li>
+                <li>New enrollments</li>
+            </ul>
+            <p>For each activity, it shows the date, student name, course, activity description, and status.</p>
+        </div>
+        
+        <div class="card">
+            <h2 id="students-module">3. Students Module</h2>
+            <p>This module is for managing all student records and their enrollments.</p>
+            
+            <h3 id="viewing-students">Viewing & Filtering Students</h3>
+            <p>The main table lists all students. You can filter this list using the controls above the table:</p>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Use the <strong>Search Box</strong> to type a student's name and find specific students.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                Use the <strong>Course Filter</strong> dropdown to select a specific course and show only students enrolled in it.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Use the <strong>Status Filter</strong> dropdown to filter students by their overall status: On Track, Behind, At Risk, or Completed.
+            </div>
+            
+            <h3 id="adding-student">Adding a New Student</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Click the <strong>"Add New Student"</strong> button.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                Fill in the required fields: <strong>First Name</strong> and <strong>Last Name</strong>.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Add optional contact information: <strong>Email</strong> and <strong>Phone</strong>.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                In the <strong>Enrolled Courses</strong> multi-select box, choose all courses this student is taking.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                <strong>For Rolling Intake Courses:</strong> A date field will appear for each rolling intake course you select. Set the student's individual start date for that course.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">6</span>
+                <strong>Selecting Units:</strong> For each selected course, a list of units will appear. By default, all units are selected. Uncheck any units the student is not required to take.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">7</span>
+                Click <strong>Save</strong>. The student will be added, and progress tracking will be initialized for all selected units and tasks.
+            </div>
+            
+            <h3 id="editing-student">Editing a Student</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                In the Students table, click the <strong>"Edit"</strong> button next to the student's name.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                The same modal used for adding a student will open, pre-populated with the student's existing data.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Modify any details, enrollments, or unit selections as needed.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                Click <strong>Save</strong>. This will update the student's record and adjust their progress data if units were added or removed.
+            </div>
+            
+            <h3 id="student-details">Viewing Student Details & Updating Progress</h3>
+            <p>This is the primary way to update a student's progress.</p>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                In the Students table, click the <strong>"View"</strong> button next to the student's name.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                A detailed modal will open showing the student's contact info, overall status, and a list of their enrolled courses.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                For each course, you can see the overall progress bar and status.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                Click on a <strong>course unit</strong> to expand it and see the individual assessment tasks.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                <strong>To update a task's status,</strong> click on the colored circle next to the task name. It will cycle through four statuses:
+            </div>
+            
+            <ul>
+                <li><strong>Grey (<code>not-started</code>)</strong>: Task has not been attempted.</li>
+                <li><strong>Green (<code>completed</code>)</strong>: Task has been successfully completed.</li>
+                <li><strong>Yellow (<code>partial</code>)</strong>: Task is partially complete or needs revision.</li>
+                <li><strong>Red (<code>failed</code>)</strong>: Task was attempted but not passed.</li>
+            </ul>
+            
+            <div class="step">
+                <span class="step-number">6</span>
+                The student's progress percentage and status badges will update in real-time as you click. This action is automatically saved and logged in the Recent Activity feed.
+            </div>
+            
+            <h3 id="deleting-student">Deleting a Student</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Click the <strong>"Delete"</strong> button next to the student's name in the table.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                A confirmation dialog will appear warning you that all of the student's progress data will be permanently removed.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Click <strong>OK</strong> to confirm deletion or <strong>Cancel</strong> to keep the student.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="courses-module">4. Courses Module</h2>
+            <p>This module is for setting up and managing the structure of your vocational courses.</p>
+            
+            <h3 id="viewing-courses">Viewing Courses</h3>
+            <p>The main table lists all created courses, showing their:</p>
+            <ul>
+                <li>Course Code</li>
+                <li>Course Name</li>
+                <li>Duration (weeks)</li>
+                <li>Start Date (or "Rolling Intake")</li>
+                <li>Number of enrolled students</li>
+                <li>Action buttons (Edit, Delete, Units)</li>
+            </ul>
+            
+            <h3 id="adding-course">Adding a New Course</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Click the <strong>"Add New Course"</strong> button.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                Fill in the required fields:
+                <ul>
+                    <li><strong>Course Code:</strong> A short identifier (e.g., <code>CERT3-IT</code>)</li>
+                    <li><strong>Course Name:</strong> The full name of the course</li>
+                    <li><strong>Duration:</strong> The length of the course in weeks</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Configure the intake:
+                <ul>
+                    <li><strong>Start Date:</strong> Set a fixed start date for the entire course</li>
+                    <li><strong>Rolling Intake:</strong> Check this box if students can start the course at any time. This will disable the fixed start date and allow you to set individual start dates for each student upon enrollment.</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                Add an optional <strong>Description</strong>.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                Click <strong>Save</strong>. The course will now appear in the table and be available for student enrollment.
+            </div>
+            
+            <h3 id="editing-course">Editing a Course</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                In the Courses table, click the <strong>"Edit"</strong> button for the course you want to modify.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                Change any of the course details (code, name, duration, intake settings, description).
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Click <strong>Save</strong>.
+            </div>
+            
+            <h3 id="managing-units">Managing Course Units</h3>
+            <p>Courses are made up of Units, which contain Assessment Tasks.</p>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                In the Courses table, click the <strong>"Units"</strong> button for the desired course.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                The lower section of the page will refresh to show a table of all units within that course.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>To Add a Unit:</strong>
+                <ul>
+                    <li>Click the <strong>"Add Unit"</strong> button.</li>
+                    <li>Fill in the <strong>Unit Code</strong>, <strong>Unit Name</strong>, and <strong>Order in Course</strong> (a number determining its sequence).</li>
+                    <li>Add an optional <strong>Description</strong>.</li>
+                    <li><strong>Add Assessment Tasks:</strong> Click the "Add Task" button to create a new field for each assessment task (e.g., "Written Report", "Practical Demo"). Name each task clearly.</li>
+                    <li>Click <strong>Save</strong>. The unit is added to the course.</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                <strong>To Edit a Unit:</strong> Click the <strong>"Edit"</strong> button next to the unit in the list. Modify its details or tasks and click <strong>Save</strong>.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                <strong>To Delete a Unit:</strong> Click the <strong>"Delete"</strong> button next to the unit. <span class="warning"><strong>Warning:</strong> This will also delete all student progress data associated with this unit.</span>
+            </div>
+            
+            <h3 id="deleting-course">Deleting a Course</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                Click the <strong>"Delete"</strong> button for the course in the table.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                A confirmation dialog will warn you that this will also delete all units, tasks, and student progress data for this course.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Click <strong>OK</strong> to confirm or <strong>Cancel</strong> to abort.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="reports-module">5. Reports Module</h2>
+            <p>This module allows you to generate various reports based on your data.</p>
+            
+            <h3 id="generating-reports">Generating Reports</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Select Report Type:</strong>
+                <ul>
+                    <li><strong>Completion Report:</strong> Shows completion rates (%) for each course.</li>
+                    <li><strong>Progress Report:</strong> Lists each student's progress (tasks completed) and status for selected courses.</li>
+                    <li><strong>Attendance Report:</strong> Shows a log of all student activities within a date range.</li>
+                    <li><strong>Task Completion Report:</strong> Provides a detailed breakdown, for each task in each unit, of how many students have completed, not started, partially completed, or failed it.</li>
+                    <li><strong>Custom Report:</strong> Shows a summary of available data.</li>
+                </ul>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Select Course:</strong> Choose a specific course or "All Courses".
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                <strong>Set Date Range:</strong> For relevant reports (like Attendance), set a start and end date to filter the results.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">4</span>
+                Click the <strong>"Generate Report"</strong> button.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">5</span>
+                The results will appear in the <strong>Report Results</strong> section below the button.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="settings-module">6. Settings Module</h2>
+            
+            <h3 id="app-settings">Application Settings</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Institution Name:</strong> Change the name displayed at the top of the application.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Color Theme:</strong> Choose from predefined color schemes (Blue, Green, Red, Purple) or select <strong>Custom</strong> to define your own Primary, Secondary, and Accent colors using the color pickers that appear.
+            </div>
+            
+            <div class="step">
+                <span class="step-number">3</span>
+                Click <strong>Save Settings</strong> to apply your changes.
+            </div>
+            
+            <h3 id="data-management">Data Management</h3>
+            
+            <div class="step">
+                <span class="step-number">1</span>
+                <strong>Export Data:</strong> Click this button to download a complete backup of all your application data (students, courses, progress, settings) as a <code>.json</code> file. <span class="important"><strong>This is your primary backup method.</strong></span>
+            </div>
+            
+            <div class="step">
+                <span class="step-number">2</span>
+                <strong>Import Data:</strong> Click this button to upload a previously exported <code>.json</code> file and restore your data. <span class="warning"><strong>Warning:</strong> This will completely overwrite all current data in the application.</span> A confirmation dialog will appear.
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2 id="troubleshooting">7. Troubleshooting</h2>
+            
+            <div class="feature-block">
+                <div class="feature-icon">❓</div>
+                <div class="feature-content">
+                    <h3>"My data is gone!"</h3>
+                    <p>The app stores data in your specific browser. If you switch browsers or devices, the data will not be there. Always use <strong>Export Data</strong> to create a backup you can import elsewhere.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">❓</div>
+                <div class="feature-content">
+                    <h3>The page looks broken</h3>
+                    <p>Ensure you are using a modern, up-to-date browser like Chrome, Firefox, Edge, or Safari.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">❓</div>
+                <div class="feature-content">
+                    <h3>A feature isn't working</h3>
+                    <p>Open your browser's Developer Tools (F12) and check the "Console" tab for any error messages (red text). This can help identify the issue.</p>
+                </div>
+            </div>
+            
+            <div class="feature-block">
+                <div class="feature-icon">❓</div>
+                <div class="feature-content">
+                    <h3>I get an alert about an error</h3>
+                    <p>The application has built-in error handling. Read the alert message carefully, as it often explains what went wrong (e.g., a required field was left empty).</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="back-to-top">
+            <a href="#">Back to Top ↑</a>
+        </div>
+    </div>
+</body>
+</html>
