@@ -6,21 +6,23 @@
     <title>Vocational Education Progress Tracker - User Guide</title>
     <style>
         :root {
-            --primary-color: #4a6fa5;
-            --secondary-color: #166088;
-            --accent-color: #4fc3f7;
-            --light-color: #f8f9fa;
-            --dark-color: #343a40;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
+            --primary-color: #2c5282;    /* Heading color (dark blue) */
+            --secondary-color: #3182ce;  /* Secondary elements (medium blue) */
+            --accent-color: #63b3ed;     /* Accent color (light blue) */
+            --header-color: #2c5282;     /* Header background (dark blue) */
+            --light-color: #f8f9fa;      /* Light background */
+            --dark-color: #2d3748;       /* Dark text color */
+            --success-color: #38a169;    /* Success green */
+            --warning-color: #d69e2e;    /* Warning orange */
+            --danger-color: #e53e3e;     /* Danger red */
+            --header-text: #ffffff;      /* Header text color */
         }
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             line-height: 1.6;
             color: var(--dark-color);
-            background-color: #f5f7fa;
+            background-color: #f7fafc;
             margin: 0;
             padding: 0;
         }
@@ -32,8 +34,8 @@
         }
         
         header {
-            background-color: var(--primary-color);
-            color: white;
+            background-color: var(--header-color);
+            color: var(--header-text);
             padding: 30px 0;
             margin-bottom: 30px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -42,29 +44,39 @@
         
         h1, h2, h3, h4 {
             margin-top: 0;
-            color: #f8f9fa;
         }
         
         h1 {
-            border-bottom: 2px solid var(--secondary-color);
+            color: var(--header-text);
+            border-bottom: 2px solid rgba(255, 255, 255, 0.2);
             padding-bottom: 15px;
+            font-size: 2.5rem;
         }
         
         h2 {
+            color: var(--primary-color);
             border-left: 5px solid var(--primary-color);
             padding-left: 15px;
             margin-top: 40px;
+            font-size: 1.8rem;
         }
         
         h3 {
             color: var(--secondary-color);
             margin-top: 30px;
+            font-size: 1.4rem;
+        }
+        
+        h4 {
+            color: var(--secondary-color);
+            margin-top: 20px;
+            font-size: 1.2rem;
         }
         
         .card {
             background: white;
             border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
             padding: 25px;
             margin-bottom: 25px;
         }
@@ -89,6 +101,7 @@
         .toc a {
             color: var(--secondary-color);
             text-decoration: none;
+            font-weight: 500;
         }
         
         .toc a:hover {
@@ -97,7 +110,7 @@
         }
         
         .note {
-            background-color: #e8f4fd;
+            background-color: #ebf8ff;
             border-left: 4px solid var(--accent-color);
             padding: 15px;
             margin: 20px 0;
@@ -105,7 +118,7 @@
         }
         
         .warning {
-            background-color: #fff3cd;
+            background-color: #fffaf0;
             border-left: 4px solid var(--warning-color);
             padding: 15px;
             margin: 20px 0;
@@ -113,7 +126,7 @@
         }
         
         .important {
-            background-color: #f8d7da;
+            background-color: #fff5f5;
             border-left: 4px solid var(--danger-color);
             padding: 15px;
             margin: 20px 0;
@@ -121,7 +134,7 @@
         }
         
         .screenshot {
-            border: 1px solid #ddd;
+            border: 1px solid #e2e8f0;
             border-radius: 4px;
             padding: 4px;
             margin: 15px 0;
@@ -168,14 +181,15 @@
         }
         
         code {
-            background-color: #f4f4f4;
+            background-color: #edf2f7;
             padding: 2px 6px;
             border-radius: 4px;
             font-family: monospace;
+            color: var(--dark-color);
         }
         
         pre {
-            background-color: #f8f9fa;
+            background-color: #edf2f7;
             padding: 15px;
             border-radius: 5px;
             overflow-x: auto;
@@ -190,6 +204,7 @@
         .back-to-top a {
             color: var(--primary-color);
             text-decoration: none;
+            font-weight: 500;
         }
         
         @media (max-width: 768px) {
@@ -199,6 +214,14 @@
             
             .feature-block {
                 flex-direction: column;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            h2 {
+                font-size: 1.6rem;
             }
         }
     </style>
@@ -599,7 +622,7 @@
                     <li>Click the <strong>"Add Unit"</strong> button.</li>
                     <li>Fill in the <strong>Unit Code</strong>, <strong>Unit Name</strong>, and <strong>Order in Course</strong> (a number determining its sequence).</li>
                     <li>Add an optional <strong>Description</strong>.</li>
-                    <li><strong>Add Assessment Tasks:</strong> Click the "Add Task" button to create a new field for each assessment task (e.g., "Written Report", "Practical Demo"). Name each task clearly.</li>
+                    <li><strong>Add Assessment Tasks:</strong> Click the "Add Task" button to create a new field for each assessment task (e.e., "Written Report", "Practical Demo"). Name each task clearly.</li>
                     <li>Click <strong>Save</strong>. The unit is added to the course.</li>
                 </ul>
             </div>
