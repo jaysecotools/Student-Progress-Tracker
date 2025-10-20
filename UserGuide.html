@@ -207,6 +207,97 @@
             font-weight: 500;
         }
         
+        /* Theme Controls Styles */
+        .theme-controls {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            padding: 20px;
+            margin-bottom: 25px;
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+        }
+        
+        .theme-controls h3 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+        
+        .theme-selector {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .theme-selector label {
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        .theme-selector select {
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background-color: white;
+            color: var(--dark-color);
+            font-size: 14px;
+        }
+        
+        .custom-color-picker {
+            display: none;
+            margin-top: 15px;
+            padding: 15px;
+            background-color: var(--light-color);
+            border-radius: 6px;
+        }
+        
+        .color-picker-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .color-picker-group label {
+            min-width: 120px;
+            font-weight: 500;
+        }
+        
+        .color-picker-group input[type="color"] {
+            width: 50px;
+            height: 40px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .theme-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .theme-actions button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        
+        .save-theme-btn {
+            background-color: var(--success-color);
+            color: white;
+        }
+        
+        .reset-theme-btn {
+            background-color: var(--warning-color);
+            color: white;
+        }
+        
         @media (max-width: 768px) {
             .toc ul {
                 columns: 1;
@@ -223,6 +314,16 @@
             h2 {
                 font-size: 1.6rem;
             }
+            
+            .theme-selector {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .color-picker-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
         }
     </style>
 </head>
@@ -235,6 +336,44 @@
     </header>
     
     <div class="container">
+        <!-- Theme Controls -->
+        <div class="theme-controls">
+            <h3>Customize Color Theme</h3>
+            <div class="theme-selector">
+                <label for="themeSelector">Select Theme:</label>
+                <select id="themeSelector">
+                    <option value="blue">Blue Theme</option>
+                    <option value="green">Green Theme</option>
+                    <option value="red">Red Theme</option>
+                    <option value="purple">Purple Theme</option>
+                    <option value="custom">Custom Theme</option>
+                </select>
+            </div>
+            
+            <div id="customColorPicker" class="custom-color-picker">
+                <div class="color-picker-group">
+                    <label for="primaryColor">Primary Color:</label>
+                    <input type="color" id="primaryColor" value="#2c5282">
+                    <span id="primaryColorValue">#2c5282</span>
+                </div>
+                <div class="color-picker-group">
+                    <label for="secondaryColor">Secondary Color:</label>
+                    <input type="color" id="secondaryColor" value="#3182ce">
+                    <span id="secondaryColorValue">#3182ce</span>
+                </div>
+                <div class="color-picker-group">
+                    <label for="accentColor">Accent Color:</label>
+                    <input type="color" id="accentColor" value="#63b3ed">
+                    <span id="accentColorValue">#63b3ed</span>
+                </div>
+            </div>
+            
+            <div class="theme-actions">
+                <button id="saveThemeBtn" class="save-theme-btn">Save Theme</button>
+                <button id="resetThemeBtn" class="reset-theme-btn">Reset to Default</button>
+            </div>
+        </div>
+        
         <div class="card">
             <h2>Introduction</h2>
             <p>The <strong>Vocational Education Progress Tracker</strong> is a web-based application designed for educators and administrators to monitor and manage student progress through certificate-based courses. It provides a centralized platform to track individual student task completion, manage course structures, visualize overall progress, identify at-risk students, and generate detailed reports.</p>
@@ -767,5 +906,168 @@
             <a href="#">Back to Top ↑</a>
         </div>
     </div>
+
+    <script>
+        // Theme Management Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const themeSelector = document.getElementById('themeSelector');
+            const customColorPicker = document.getElementById('customColorPicker');
+            const primaryColor = document.getElementById('primaryColor');
+            const secondaryColor = document.getElementById('secondaryColor');
+            const accentColor = document.getElementById('accentColor');
+            const saveThemeBtn = document.getElementById('saveThemeBtn');
+            const resetThemeBtn = document.getElementById('resetThemeBtn');
+            
+            // Predefined color themes
+            const themes = {
+                blue: {
+                    primary: '#2c5282',
+                    secondary: '#3182ce',
+                    accent: '#63b3ed',
+                    header: '#2c5282'
+                },
+                green: {
+                    primary: '#276749',
+                    secondary: '#38a169',
+                    accent: '#68d391',
+                    header: '#276749'
+                },
+                red: {
+                    primary: '#9b2c2c',
+                    secondary: '#e53e3e',
+                    accent: '#fc8181',
+                    header: '#9b2c2c'
+                },
+                purple: {
+                    primary: '#553c9a',
+                    secondary: '#805ad5',
+                    accent: '#b794f4',
+                    header: '#553c9a'
+                }
+            };
+            
+            // Show/hide custom color picker based on theme selection
+            themeSelector.addEventListener('change', function() {
+                if (this.value === 'custom') {
+                    customColorPicker.style.display = 'block';
+                    
+                    // Load saved custom colors if available
+                    const savedCustomColors = JSON.parse(localStorage.getItem('customColors'));
+                    if (savedCustomColors) {
+                        primaryColor.value = savedCustomColors.primary;
+                        secondaryColor.value = savedCustomColors.secondary;
+                        accentColor.value = savedCustomColors.accent;
+                        updateColorValues();
+                    }
+                } else {
+                    customColorPicker.style.display = 'none';
+                    applyTheme(this.value);
+                }
+            });
+            
+            // Update color value displays when color pickers change
+            primaryColor.addEventListener('input', updateColorValues);
+            secondaryColor.addEventListener('input', updateColorValues);
+            accentColor.addEventListener('input', updateColorValues);
+            
+            // Save theme button click handler
+            saveThemeBtn.addEventListener('click', function() {
+                const selectedTheme = themeSelector.value;
+                
+                if (selectedTheme === 'custom') {
+                    // Save custom colors
+                    const customColors = {
+                        primary: primaryColor.value,
+                        secondary: secondaryColor.value,
+                        accent: accentColor.value,
+                        header: primaryColor.value // Use primary color for header
+                    };
+                    
+                    localStorage.setItem('customColors', JSON.stringify(customColors));
+                    applyCustomTheme(customColors);
+                }
+                
+                // Save theme selection
+                localStorage.setItem('selectedTheme', selectedTheme);
+                
+                // Show confirmation
+                alert('Theme saved successfully!');
+            });
+            
+            // Reset theme button click handler
+            resetThemeBtn.addEventListener('click', function() {
+                // Reset to default blue theme
+                themeSelector.value = 'blue';
+                customColorPicker.style.display = 'none';
+                
+                // Clear saved theme
+                localStorage.removeItem('selectedTheme');
+                localStorage.removeItem('customColors');
+                
+                // Apply default theme
+                applyTheme('blue');
+                
+                // Show confirmation
+                alert('Theme reset to default!');
+            });
+            
+            // Apply a predefined theme
+            function applyTheme(themeName) {
+                const theme = themes[themeName];
+                const root = document.documentElement;
+                
+                root.style.setProperty('--primary-color', theme.primary);
+                root.style.setProperty('--secondary-color', theme.secondary);
+                root.style.setProperty('--accent-color', theme.accent);
+                root.style.setProperty('--header-color', theme.header);
+            }
+            
+            // Apply custom theme colors
+            function applyCustomTheme(colors) {
+                const root = document.documentElement;
+                
+                root.style.setProperty('--primary-color', colors.primary);
+                root.style.setProperty('--secondary-color', colors.secondary);
+                root.style.setProperty('--accent-color', colors.accent);
+                root.style.setProperty('--header-color', colors.header);
+            }
+            
+            // Update the displayed color values
+            function updateColorValues() {
+                document.getElementById('primaryColorValue').textContent = primaryColor.value;
+                document.getElementById('secondaryColorValue').textContent = secondaryColor.value;
+                document.getElementById('accentColorValue').textContent = accentColor.value;
+            }
+            
+            // Load saved theme on page load
+            function loadSavedTheme() {
+                const savedTheme = localStorage.getItem('selectedTheme');
+                
+                if (savedTheme) {
+                    themeSelector.value = savedTheme;
+                    
+                    if (savedTheme === 'custom') {
+                        customColorPicker.style.display = 'block';
+                        const savedCustomColors = JSON.parse(localStorage.getItem('customColors'));
+                        
+                        if (savedCustomColors) {
+                            primaryColor.value = savedCustomColors.primary;
+                            secondaryColor.value = savedCustomColors.secondary;
+                            accentColor.value = savedCustomColors.accent;
+                            updateColorValues();
+                            applyCustomTheme(savedCustomColors);
+                        }
+                    } else {
+                        applyTheme(savedTheme);
+                    }
+                }
+            }
+            
+            // Initialize
+            updateColorValues();
+            loadSavedTheme();
+        });
+    </script>
 </body>
 </html>
