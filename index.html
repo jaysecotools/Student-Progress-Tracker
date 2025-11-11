@@ -877,8 +877,29 @@
                 <!-- Filled by JavaScript -->
             </div>
             
+            <!-- ADDED: Generate Summary Button -->
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn" id="generate-summary-btn">Generate Progress Summary</button>
+            </div>
+            
             <div style="display: flex; justify-content: flex-end; margin-top: 20px;">
                 <button type="button" class="btn btn-danger" id="close-student-detail-btn">Close</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ADDED: Student Summary Modal -->
+    <div id="student-summary-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+            <span class="close-modal">&times;</span>
+            <h2>Student Progress Summary</h2>
+            <div id="summary-content">
+                <!-- Summary content will be generated here -->
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button class="btn" id="print-summary-btn">Print</button>
+                <button class="btn" id="download-summary-btn">Download as PDF</button>
+                <button class="btn btn-danger" id="close-summary-btn">Close</button>
             </div>
         </div>
     </div>
@@ -1108,6 +1129,7 @@
         const courseModal = document.getElementById('course-modal');
         const unitModal = document.getElementById('unit-modal');
         const studentDetailModal = document.getElementById('student-detail-modal');
+        const studentSummaryModal = document.getElementById('student-summary-modal');
         const studentsTable = document.getElementById('students-table');
         const coursesTable = document.getElementById('courses-table');
         const recentActivityTable = document.getElementById('recent-activity');
@@ -1599,6 +1621,9 @@
                 document.getElementById('student-detail-name').textContent = `${student.firstName || ''} ${student.lastName || ''}`;
                 document.getElementById('student-detail-email').textContent = student.email || 'N/A';
                 document.getElementById('student-detail-phone').textContent = student.phone || 'N/A';
+                
+                // Set student ID for the summary button
+                document.getElementById('student-detail-name').setAttribute('data-student-id', studentId);
                 
                 // Calculate overall status and progress
                 let overallProgress = 0;
@@ -2896,6 +2921,320 @@
             });
         }
         
+        // NEW: Generate student summary
+        function generateStudentSummary(studentId) {
+            try {
+                const student = appData.students.find(s => s.id === studentId);
+                if (!student) return;
+                
+                const summaryContent = document.getElementById('summary-content');
+                summaryContent.innerHTML = '';
+                
+                // Generate summary HTML
+                const summaryHTML = createSummaryHTML(student);
+                summaryContent.innerHTML = summaryHTML;
+                
+                // Show the summary modal
+                studentSummaryModal.style.display = 'block';
+            } catch (e) {
+                console.error('Error generating student summary:', e);
+                alert('Error generating student summary');
+            }
+        }
+        
+        // NEW: Create summary HTML
+        function createSummaryHTML(student) {
+            const today = new Date().toLocaleDateString();
+            
+            // Calculate overall progress
+            let overallProgress = 0;
+            let totalCourses = 0;
+            let completedCourses = 0;
+            let totalUnits = 0;
+            let completedUnits = 0;
+            let totalTasks = 0;
+            let completedTasks = 0;
+            
+            // Calculate statistics
+            student.courses.forEach(courseObj => {
+                const course = appData.courses.find(c => c.id === courseObj.courseId);
+                if (course) {
+                    totalCourses++;
+                    const courseProgress = student.progress[course.id] || { units: {} };
+                    
+                    let courseCompleted = true;
+                    let courseUnits = 0;
+                    let courseCompletedUnits = 0;
+                    let courseTasks = 0;
+                    let courseCompletedTasks = 0;
+                    
+                    course.units.forEach(unit => {
+                        if (courseObj.units.includes(unit.id)) {
+                            totalUnits++;
+                            courseUnits++;
+                            
+                            const unitProgress = courseProgress.units[unit.id] || { completedTasks: 0, totalTasks: unit.tasks.length };
+                            const unitCompleted = unitProgress.completedTasks === unitProgress.totalTasks;
+                            
+                            if (unitCompleted) {
+                                completedUnits++;
+                                courseCompletedUnits++;
+                            }
+                            
+                            totalTasks += unit.tasks.length;
+                            courseTasks += unit.tasks.length;
+                            completedTasks += unitProgress.completedTasks;
+                            courseCompletedTasks += unitProgress.completedTasks;
+                            
+                            if (!unitCompleted) {
+                                courseCompleted = false;
+                            }
+                        }
+                    });
+                    
+                    if (courseCompleted && courseUnits > 0) {
+                        completedCourses++;
+                    }
+                }
+            });
+            
+            overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            
+            let html = `
+                <div class="summary-header" style="border-bottom: 2px solid var(--primary-color); padding-bottom: 15px; margin-bottom: 20px;">
+                    <h3>${appData.settings.institutionName || 'Vocational Training Institute'}</h3>
+                    <h1>Student Progress Summary</h1>
+                    <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                        <div>
+                            <p><strong>Student:</strong> ${student.firstName} ${student.lastName}</p>
+                            <p><strong>Student ID:</strong> ${student.id}</p>
+                            <p><strong>Email:</strong> ${student.email || 'N/A'}</p>
+                        </div>
+                        <div>
+                            <p><strong>Report Date:</strong> ${today}</p>
+                            <p><strong>Overall Progress:</strong> ${overallProgress}%</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="summary-overview" style="margin-bottom: 30px;">
+                    <h3>Progress Overview</h3>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px;">
+                        <div class="card" style="text-align: center;">
+                            <h4>Courses</h4>
+                            <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${completedCourses}/${totalCourses}</p>
+                            <p>Completed</p>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <h4>Units</h4>
+                            <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${completedUnits}/${totalUnits}</p>
+                            <p>Completed</p>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <h4>Tasks</h4>
+                            <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${completedTasks}/${totalTasks}</p>
+                            <p>Completed</p>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <h4>Overall Progress</h4>
+                            <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">${overallProgress}%</p>
+                            <div class="progress-bar" style="margin-top: 5px;">
+                                <div class="progress" style="width: ${overallProgress}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add course details
+            html += `<div class="course-details"><h3>Course Details</h3>`;
+            
+            student.courses.forEach(courseObj => {
+                const course = appData.courses.find(c => c.id === courseObj.courseId);
+                if (!course) return;
+                
+                const courseProgress = student.progress[course.id] || { units: {} };
+                let courseTasksCompleted = 0;
+                let courseTotalTasks = 0;
+                let courseUnitsCompleted = 0;
+                let courseTotalUnits = 0;
+                
+                course.units.forEach(unit => {
+                    if (courseObj.units.includes(unit.id)) {
+                        courseTotalUnits++;
+                        const unitProgress = courseProgress.units[unit.id] || { completedTasks: 0, totalTasks: unit.tasks.length };
+                        courseTasksCompleted += unitProgress.completedTasks;
+                        courseTotalTasks += unit.tasks.length;
+                        
+                        if (unitProgress.completedTasks === unitProgress.totalTasks) {
+                            courseUnitsCompleted++;
+                        }
+                    }
+                });
+                
+                const courseProgressPercentage = courseTotalTasks > 0 ? Math.round((courseTasksCompleted / courseTotalTasks) * 100) : 0;
+                const courseStatus = getStudentStatus(student, course.id);
+                
+                html += `
+                    <div class="card" style="margin-bottom: 20px;">
+                        <h4>${course.code} - ${course.name}</h4>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div>
+                                <p><strong>Progress:</strong> ${courseTasksCompleted}/${courseTotalTasks} tasks (${courseProgressPercentage}%)</p>
+                                <div class="progress-bar" style="width: 100%; margin-top: 5px;">
+                                    <div class="progress" style="width: ${courseProgressPercentage}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge ${getStatusBadgeClass(courseStatus)}">${formatStatus(courseStatus)}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p><strong>Units:</strong> ${courseUnitsCompleted}/${courseTotalUnits} completed</p>
+                            <p><strong>Start Date:</strong> ${course.rollingIntake ? (courseObj.startDate || 'Not specified') : (course.startDate || 'Not specified')}</p>
+                            <p><strong>Last Activity:</strong> ${courseProgress.lastActivity || 'No activity recorded'}</p>
+                        </div>
+                        
+                        <div class="unit-breakdown" style="margin-top: 15px;">
+                            <h5>Unit Progress</h5>
+                            <table style="width: 100%;">
+                                <thead>
+                                    <tr>
+                                        <th>Unit Code</th>
+                                        <th>Unit Name</th>
+                                        <th>Tasks Completed</th>
+                                        <th>Progress</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                `;
+                
+                course.units
+                    .filter(unit => courseObj.units.includes(unit.id))
+                    .sort((a, b) => a.order - b.order)
+                    .forEach(unit => {
+                        const unitProgress = courseProgress.units[unit.id] || { completedTasks: 0, totalTasks: unit.tasks.length };
+                        const unitPercentage = unitProgress.totalTasks > 0 ? Math.round((unitProgress.completedTasks / unitProgress.totalTasks) * 100) : 0;
+                        const unitStatus = getUnitStatus(student, course.id, unit.id);
+                        
+                        html += `
+                            <tr>
+                                <td>${unit.code}</td>
+                                <td>${unit.name}</td>
+                                <td>${unitProgress.completedTasks}/${unitProgress.totalTasks}</td>
+                                <td>
+                                    <div class="progress-bar" style="width: 100%;">
+                                        <div class="progress" style="width: ${unitPercentage}%"></div>
+                                    </div>
+                                </td>
+                                <td><span class="badge ${getStatusBadgeClass(unitStatus)}">${formatStatus(unitStatus)}</span></td>
+                            </tr>
+                        `;
+                    });
+                
+                html += `
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="remaining-tasks" style="margin-top: 15px;">
+                            <h5>Remaining Tasks</h5>
+                `;
+                
+                let hasRemainingTasks = false;
+                course.units
+                    .filter(unit => courseObj.units.includes(unit.id))
+                    .sort((a, b) => a.order - b.order)
+                    .forEach(unit => {
+                        const unitProgress = courseProgress.units[unit.id] || { completedTasks: 0, totalTasks: unit.tasks.length };
+                        
+                        if (unitProgress.completedTasks < unitProgress.totalTasks) {
+                            hasRemainingTasks = true;
+                            html += `<p><strong>${unit.code} - ${unit.name}:</strong>`;
+                            
+                            unit.tasks.forEach((task, index) => {
+                                const taskStatus = student.taskStatus?.[course.id]?.[unit.id]?.[task.id] || 'not-started';
+                                if (taskStatus !== 'completed') {
+                                    html += `<br> - ${task.name} (${formatStatus(taskStatus)})`;
+                                }
+                            });
+                            
+                            html += `</p>`;
+                        }
+                    });
+                
+                if (!hasRemainingTasks) {
+                    html += `<p>All tasks completed for this course.</p>`;
+                }
+                
+                html += `</div></div>`;
+            });
+            
+            html += `</div>`;
+            
+            return html;
+        }
+        
+        // NEW: Download summary as PDF
+        function downloadSummaryAsPDF() {
+            try {
+                const studentId = document.getElementById('student-detail-name').getAttribute('data-student-id');
+                const student = appData.students.find(s => s.id === parseInt(studentId));
+                
+                if (!student) return;
+                
+                // Create a print-friendly version
+                const summaryContent = document.getElementById('summary-content').innerHTML;
+                const printWindow = window.open('', '_blank');
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Student Progress Summary - ${student.firstName} ${student.lastName}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.4; color: #333; margin: 20px; }
+                            h1, h2, h3, h4, h5 { color: #2c3e50; }
+                            .summary-header { border-bottom: 2px solid #4a6fa5; padding-bottom: 15px; margin-bottom: 20px; }
+                            .card { border: 1px solid #ddd; border-radius: 5px; padding: 15px; margin-bottom: 15px; background: #f9f9f9; }
+                            .progress-bar { height: 20px; background-color: #e9ecef; border-radius: 4px; overflow: hidden; }
+                            .progress { height: 100%; background-color: #28a745; }
+                            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+                            th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+                            th { background-color: #4a6fa5; color: white; }
+                            .badge { display: inline-block; padding: 3px 7px; font-size: 12px; font-weight: 700; border-radius: 10px; }
+                            .badge-success { background-color: #28a745; color: white; }
+                            .badge-warning { background-color: #ffc107; color: #212529; }
+                            .badge-danger { background-color: #dc3545; color: white; }
+                            .badge-info { background-color: #4fc3f7; color: white; }
+                            @media print {
+                                body { margin: 0; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        ${summaryContent}
+                        <div class="no-print" style="margin-top: 30px; text-align: center; font-style: italic;">
+                            <p>Generated on ${new Date().toLocaleDateString()} by Vocational Education Progress Tracker</p>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                
+                printWindow.document.close();
+                
+                // Wait for content to load then print
+                setTimeout(() => {
+                    printWindow.print();
+                }, 500);
+            } catch (e) {
+                console.error('Error downloading summary as PDF:', e);
+                alert('Error generating PDF. Please try printing the page instead.');
+            }
+        }
+        
         // Setup event listeners
         function setupEventListeners() {
             try {
@@ -2964,6 +3303,27 @@
                             showStudentDetails(studentId);
                         }
                     }
+                });
+                
+                // NEW: Generate summary button
+                document.getElementById('generate-summary-btn').addEventListener('click', function() {
+                    const studentId = document.getElementById('student-detail-name').getAttribute('data-student-id');
+                    if (studentId) {
+                        generateStudentSummary(parseInt(studentId));
+                    }
+                });
+                
+                // NEW: Summary modal buttons
+                document.getElementById('close-summary-btn').addEventListener('click', function() {
+                    studentSummaryModal.style.display = 'none';
+                });
+                
+                document.getElementById('print-summary-btn').addEventListener('click', function() {
+                    window.print();
+                });
+                
+                document.getElementById('download-summary-btn').addEventListener('click', function() {
+                    downloadSummaryAsPDF();
                 });
                 
                 document.getElementById('student-form').addEventListener('submit', e => {
