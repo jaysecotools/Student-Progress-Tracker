@@ -1272,8 +1272,8 @@
             renderStudents();
             renderCourses();
             renderRecentActivity();
-            renderAnalytics();
-            setupEventListeners();
+            setupEventListeners(); // Moved this before renderAnalytics
+            renderAnalytics(); // Now this will work properly
             
             // Initialize report filters
             const reportCourseSelect = document.getElementById('report-course');
@@ -1740,44 +1740,50 @@
             }
         }
         
-        // NEW: Render analytics for reverse look-up
+        // NEW: Render analytics for reverse look-up - FIXED VERSION
         function renderAnalytics() {
             try {
                 // Populate course filter for analytics
                 const analyticsCourseFilter = document.getElementById('analytics-course-filter');
-                analyticsCourseFilter.innerHTML = '<option value="">All Courses</option>';
-                appData.courses?.forEach(course => {
-                    const option = document.createElement('option');
-                    option.value = course.id;
-                    option.textContent = `${course.code} - ${course.name}`;
-                    analyticsCourseFilter.appendChild(option);
-                });
+                if (analyticsCourseFilter) {
+                    analyticsCourseFilter.innerHTML = '<option value="">All Courses</option>';
+                    appData.courses?.forEach(course => {
+                        const option = document.createElement('option');
+                        option.value = course.id;
+                        option.textContent = `${course.code} - ${course.name}`;
+                        analyticsCourseFilter.appendChild(option);
+                    });
+                }
                 
                 // Populate unit filter for analytics
                 const analyticsUnitFilter = document.getElementById('analytics-unit-filter');
-                analyticsUnitFilter.innerHTML = '<option value="">All Units</option>';
-                appData.courses?.forEach(course => {
-                    course.units?.forEach(unit => {
-                        const option = document.createElement('option');
-                        option.value = `${course.id}-${unit.id}`;
-                        option.textContent = `${course.code} - ${unit.code}`;
-                        analyticsUnitFilter.appendChild(option);
+                if (analyticsUnitFilter) {
+                    analyticsUnitFilter.innerHTML = '<option value="">All Units</option>';
+                    appData.courses?.forEach(course => {
+                        course.units?.forEach(unit => {
+                            const option = document.createElement('option');
+                            option.value = `${course.id}-${unit.id}`;
+                            option.textContent = `${course.code} - ${unit.code}`;
+                            analyticsUnitFilter.appendChild(option);
+                        });
                     });
-                });
+                }
                 
                 // Populate task filter for analytics
                 const analyticsTaskFilter = document.getElementById('analytics-task-filter');
-                analyticsTaskFilter.innerHTML = '<option value="">All Tasks</option>';
-                appData.courses?.forEach(course => {
-                    course.units?.forEach(unit => {
-                        unit.tasks?.forEach(task => {
-                            const option = document.createElement('option');
-                            option.value = `${course.id}-${unit.id}-${task.id}`;
-                            option.textContent = `${course.code} - ${unit.code} - ${task.name}`;
-                            analyticsTaskFilter.appendChild(option);
+                if (analyticsTaskFilter) {
+                    analyticsTaskFilter.innerHTML = '<option value="">All Tasks</option>';
+                    appData.courses?.forEach(course => {
+                        course.units?.forEach(unit => {
+                            unit.tasks?.forEach(task => {
+                                const option = document.createElement('option');
+                                option.value = `${course.id}-${unit.id}-${task.id}`;
+                                option.textContent = `${course.code} - ${unit.code} - ${task.name}`;
+                                analyticsTaskFilter.appendChild(option);
+                            });
                         });
                     });
-                });
+                }
                 
                 // Render unit completion overview
                 renderUnitCompletionOverview();
@@ -1792,10 +1798,12 @@
             }
         }
         
-        // NEW: Render unit completion overview
+        // NEW: Render unit completion overview - FIXED VERSION
         function renderUnitCompletionOverview() {
             try {
                 const unitCompletionContainer = document.getElementById('unit-completion-container');
+                if (!unitCompletionContainer) return;
+                
                 unitCompletionContainer.innerHTML = '';
                 
                 const selectedCourseId = document.getElementById('analytics-course-filter').value;
@@ -1806,7 +1814,7 @@
                     course.units?.forEach(unit => {
                         // Calculate completion statistics for this unit
                         const enrolledStudents = appData.students.filter(student => 
-                            student.courses.some(c => c.courseId === course.id && c.units.includes(unit.id))
+                            student.courses?.some(c => c.courseId === course.id && c.units?.includes(unit.id))
                         );
                         
                         const completedStudents = enrolledStudents.filter(student => {
@@ -1853,7 +1861,7 @@
             }
         }
         
-        // NEW: Show unit completion details
+        // NEW: Show unit completion details - FIXED VERSION
         function showUnitCompletionDetails(courseId, unitId) {
             try {
                 const course = appData.courses?.find(c => c.id === courseId);
@@ -1869,7 +1877,7 @@
                 
                 // Get students enrolled in this unit
                 const enrolledStudents = appData.students.filter(student => 
-                    student.courses.some(c => c.courseId === courseId && c.units.includes(unitId))
+                    student.courses?.some(c => c.courseId === courseId && c.units?.includes(unitId))
                 );
                 
                 // Calculate completion statistics
@@ -1915,7 +1923,7 @@
                 content.innerHTML += summaryHTML;
                 
                 // Add student completion details
-                const detailsHTML = `
+                let detailsHTML = `
                     <h3>Student Completion Details</h3>
                     <table>
                         <thead>
@@ -1962,16 +1970,22 @@
                 detailsHTML += '</tbody></table>';
                 content.innerHTML += detailsHTML;
                 
-                unitCompletionModal.style.display = 'block';
+                // Show the modal
+                const unitCompletionModal = document.getElementById('unit-completion-modal');
+                if (unitCompletionModal) {
+                    unitCompletionModal.style.display = 'block';
+                }
             } catch (e) {
                 console.error('Error showing unit completion details:', e);
             }
         }
         
-        // NEW: Render task completion tracking
+        // NEW: Render task completion tracking - FIXED VERSION
         function renderTaskCompletionTracking() {
             try {
                 const taskCompletionContainer = document.getElementById('task-completion-container');
+                if (!taskCompletionContainer) return;
+                
                 taskCompletionContainer.innerHTML = '';
                 
                 const selectedCourseId = document.getElementById('analytics-course-filter').value;
@@ -2004,7 +2018,7 @@
                 tasksToShow.forEach(({ course, unit, task }) => {
                     // Calculate completion statistics for this task
                     const enrolledStudents = appData.students.filter(student => 
-                        student.courses.some(c => c.courseId === course.id && c.units.includes(unit.id))
+                        student.courses?.some(c => c.courseId === course.id && c.units?.includes(unit.id))
                     );
                     
                     const completedStudents = enrolledStudents.filter(student => 
@@ -2048,10 +2062,12 @@
             }
         }
         
-        // NEW: Render progress analytics
+        // NEW: Render progress analytics - FIXED VERSION
         function renderProgressAnalytics() {
             try {
                 const progressAnalyticsContainer = document.getElementById('progress-analytics-container');
+                if (!progressAnalyticsContainer) return;
+                
                 progressAnalyticsContainer.innerHTML = '';
                 
                 const selectedCourseId = document.getElementById('analytics-course-filter').value;
@@ -2162,7 +2178,7 @@
                 console.error('Error rendering progress analytics:', e);
             }
         }
-        
+
         // NEW: Calculate average progress
         function calculateAverageProgress(selectedCourseId = null) {
             try {
@@ -3867,7 +3883,7 @@
             }
         }
         
-        // Setup event listeners
+        // Setup event listeners - UPDATED VERSION
         function setupEventListeners() {
             try {
                 // Close modals when clicking outside
@@ -3963,18 +3979,27 @@
                     unitCompletionModal.style.display = 'none';
                 });
                 
-                // NEW: Analytics filter event listeners
-                document.getElementById('analytics-course-filter').addEventListener('change', function() {
-                    renderAnalytics();
-                });
+                // NEW: Analytics filter event listeners - ADD THESE
+                const analyticsCourseFilter = document.getElementById('analytics-course-filter');
+                if (analyticsCourseFilter) {
+                    analyticsCourseFilter.addEventListener('change', function() {
+                        renderAnalytics();
+                    });
+                }
                 
-                document.getElementById('analytics-unit-filter').addEventListener('change', function() {
-                    renderAnalytics();
-                });
+                const analyticsUnitFilter = document.getElementById('analytics-unit-filter');
+                if (analyticsUnitFilter) {
+                    analyticsUnitFilter.addEventListener('change', function() {
+                        renderAnalytics();
+                    });
+                }
                 
-                document.getElementById('analytics-task-filter').addEventListener('change', function() {
-                    renderAnalytics();
-                });
+                const analyticsTaskFilter = document.getElementById('analytics-task-filter');
+                if (analyticsTaskFilter) {
+                    analyticsTaskFilter.addEventListener('change', function() {
+                        renderAnalytics();
+                    });
+                }
                 
                 document.getElementById('student-form').addEventListener('submit', e => {
                     e.preventDefault();
