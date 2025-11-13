@@ -1272,8 +1272,8 @@
             renderStudents();
             renderCourses();
             renderRecentActivity();
-            setupEventListeners(); // Moved this before renderAnalytics
-            renderAnalytics(); // Now this will work properly
+            setupEventListeners();
+            renderAnalytics();
             
             // Initialize report filters
             const reportCourseSelect = document.getElementById('report-course');
@@ -1454,211 +1454,351 @@
             }
         }
         
-        function getWeeksElapsed(courseId, student, lastActivityDate) {
-            try {
-                const course = appData.courses?.find(c => c.id == courseId);
-                if (!course) return 1; // Fallback if course not found
-
-                // Get the appropriate start date
-                let startDate;
-                if (course.rollingIntake) {
-                    // For rolling intake courses, use the student's individual start date
-                    const studentCourse = student.courses?.find(c => c.courseId == courseId);
-                    startDate = studentCourse?.startDate;
-                } else {
-                    // For classroom-based courses, use the course start date
-                    startDate = course.startDate;
-                }
-
-                if (!startDate) return 1; // Fallback if no date set
-
-                const start = new Date(startDate);
-                const end = lastActivityDate ? new Date(lastActivityDate) : new Date();
-                
-                // Handle invalid dates
-                if (isNaN(start.getTime())) return 1;
-                if (isNaN(end.getTime())) return 1;
-                
-                // Calculate difference in milliseconds
-                const diffMs = end - start;
-                if (diffMs < 0) return 1; // If end is before start
-                
-                const msPerWeek = 1000 * 60 * 60 * 24 * 7;
-                const weeks = Math.floor(diffMs / msPerWeek);
-                
-                // Return weeks elapsed, clamped between 1 and course duration
-                return Math.max(1, Math.min(weeks, course.duration));
-            } catch (e) {
-                console.error("Date calculation error:", e);
-                return 1; // Fallback value
-            }
+function getWeeksElapsed(courseId, student, lastActivityDate) {
+    try {
+        // Validate inputs
+        if (!courseId || !student || typeof student !== 'object') {
+            console.warn('Invalid inputs to getWeeksElapsed');
+            return 1;
         }
+        
+        const course = appData.courses?.find(c => c.id == courseId);
+        if (!course) {
+            console.warn(`Course ${courseId} not found in getWeeksElapsed`);
+            return 1;
+        }
+        
+        // Determine start date
+        let startDate;
+        if (course.rollingIntake) {
+            const studentCourse = student.courses?.find(c => c.courseId == courseId);
+            startDate = studentCourse?.startDate;
+        } else {
+            startDate = course.startDate;
+        }
+        
+        // Validate start date
+        if (!startDate) {
+            console.warn(`No start date found for course ${courseId}, student ${student.id}`);
+            return 1;
+        }
+        
+        const start = new Date(startDate);
+        if (isNaN(start.getTime())) {
+            console.warn(`Invalid start date format: ${startDate}`);
+            return 1;
+        }
+        
+        // Determine end date (use last activity or today)
+        let end;
+        if (lastActivityDate) {
+            end = new Date(lastActivityDate);
+            if (isNaN(end.getTime())) {
+                console.warn(`Invalid lastActivityDate: ${lastActivityDate}, using today`);
+                end = new Date();
+            }
+        } else {
+            end = new Date();
+        }
+        
+        // Ensure end date is not before start date
+        if (end < start) {
+            console.warn(`End date (${end}) is before start date (${start})`);
+            return 1;
+        }
+        
+        // Calculate weeks difference
+        const diffMs = end - start;
+        const msPerWeek = 1000 * 60 * 60 * 24 * 7;
+        const weeks = Math.floor(diffMs / msPerWeek);
+        
+        // Return weeks elapsed, clamped between 1 and course duration
+        const courseDuration = Number(course.duration) || 12;
+        return Math.max(1, Math.min(weeks, courseDuration));
+        
+    } catch (e) {
+        console.error('Error in getWeeksElapsed:', e);
+        return 1; // Safe fallback
+    }
+}
         
         // Render students in table format with edit/delete buttons
-        function renderStudents(filter = '') {
-            try {
-                const tbody = studentsTable.querySelector('tbody');
-                tbody.innerHTML = '';
-                
-                const courseFilter = document.getElementById('course-filter').value;
-                const statusFilter = document.getElementById('status-filter').value;
-                
-                // Populate course filter
-                const courseFilterSelect = document.getElementById('course-filter');
-                if (courseFilterSelect.options.length <= 1) {
-                    appData.courses?.forEach(course => {
-                        const option = document.createElement('option');
-                        option.value = course.id;
-                        option.textContent = `${course.code} - ${course.name}`;
-                        courseFilterSelect.appendChild(option);
-                    });
-                }
-                
-                appData.students?.forEach(student => {
-                    if (!student) return;
-                    
-                    const fullName = `${student.firstName || ''} ${student.lastName || ''}`.trim();
-                    if (filter && !fullName.toLowerCase().includes(filter.toLowerCase())) {
-                        return;
-                    }
-                    
-                    // Check course filter
-                    if (courseFilter && !student.courses?.some(c => c.courseId === parseInt(courseFilter))) {
-                        return;
-                    }
-                    
-                    // Check status filter
-                    if (statusFilter) {
-                        let matchesStatus = false;
-                        
-                        for (const courseObj of student.courses || []) {
-                            const status = getStudentStatus(student, courseObj.courseId);
-                            
-                            if (status === statusFilter) {
-                                matchesStatus = true;
-                                break;
-                            }
-                        }
-                        
-                        if (!matchesStatus) return;
-                    }
-                    
-                    const row = document.createElement('tr');
-                    
-                    // Calculate overall progress
-                    let overallProgress = 0;
-                    let totalCourses = 0;
-                    let status = 'on-track';
-                    
-                    for (const courseObj of student.courses || []) {
-                        const courseId = courseObj.courseId;
-                        const courseProgress = student.progress?.[courseId] || { units: {} };
-                        let courseTasksCompleted = 0;
-                        let courseTotalTasks = 0;
-                        
-                        for (const unitId in courseProgress.units || {}) {
-                            courseTasksCompleted += courseProgress.units[unitId]?.completedTasks || 0;
-                            courseTotalTasks += courseProgress.units[unitId]?.totalTasks || 0;
-                        }
-                        
-                        if (courseTotalTasks > 0) {
-                            overallProgress += (courseTasksCompleted / courseTotalTasks) * 100;
-                            totalCourses++;
-                        }
-                        
-                        const courseStatus = getStudentStatus(student, courseId);
-                        if (courseStatus === 'at-risk') {
-                            status = 'at-risk';
-                        } else if (courseStatus === 'behind' && status !== 'at-risk') {
-                            status = 'behind';
-                        }
-                    }
-                    
-                    overallProgress = totalCourses > 0 ? Math.round(overallProgress / totalCourses) : 0;
-                    
-                    // Get enrolled courses names
-                    const enrolledCourses = student.courses?.map(courseObj => {
-                        const course = appData.courses?.find(c => c.id === courseObj.courseId);
-                        return course ? course.code : '';
-                    }).filter(name => name).join(', ') || 'None';
-                    
-                    row.innerHTML = `
-                        <td>${student.id}</td>
-                        <td>${fullName}</td>
-                        <td>${student.email || 'N/A'}</td>
-                        <td>${enrolledCourses}</td>
-                        <td>
-                            <button class="btn" data-student-id="${student.id}" data-action="edit">Edit</button>
-                            <button class="btn btn-danger" data-student-id="${student.id}" data-action="delete">Delete</button>
-                            <button class="btn" data-student-id="${student.id}" data-action="view">View</button>
-                        </td>
-                    `;
-                    
-                    tbody.appendChild(row);
-                });
-            } catch (e) {
-                console.error('Error rendering students:', e);
-            }
+function renderStudents(filter = '') {
+    try {
+        const tbody = studentsTable.querySelector('tbody');
+        if (!tbody) {
+            console.error('Students table body not found');
+            return;
         }
         
-        function getStudentStatus(student, courseId) {
-            try {
-                const courseProgress = student.progress?.[courseId];
-                if (!courseProgress) return 'on-track';
+        tbody.innerHTML = '';
+        
+        const courseFilter = document.getElementById('course-filter').value;
+        const statusFilter = document.getElementById('status-filter').value;
+        
+        // Populate course filter safely
+        const courseFilterSelect = document.getElementById('course-filter');
+        if (courseFilterSelect && courseFilterSelect.options.length <= 1) {
+            courseFilterSelect.innerHTML = '<option value="">All Courses</option>';
+            appData.courses?.forEach(course => {
+                if (course && course.id && course.code && course.name) {
+                    const option = document.createElement('option');
+                    option.value = course.id;
+                    option.textContent = `${course.code} - ${course.name}`;
+                    courseFilterSelect.appendChild(option);
+                }
+            });
+        }
+        
+        // Validate students array
+        if (!appData.students || !Array.isArray(appData.students)) {
+            console.warn('No students data found');
+            tbody.innerHTML = '<tr><td colspan="5">No students found</td></tr>';
+            return;
+        }
+        
+        appData.students.forEach(student => {
+            if (!student || typeof student !== 'object') {
+                console.warn('Invalid student object found');
+                return;
+            }
+            
+            const fullName = `${student.firstName || ''} ${student.lastName || ''}`.trim();
+            if (!fullName) {
+                console.warn('Student missing name:', student.id);
+                return;
+            }
+            
+            if (filter && !fullName.toLowerCase().includes(filter.toLowerCase())) {
+                return;
+            }
+            
+            // Check course filter
+            if (courseFilter && !student.courses?.some(c => c && c.courseId === parseInt(courseFilter))) {
+                return;
+            }
+            
+            // Check status filter
+            if (statusFilter) {
+                let matchesStatus = false;
                 
-                const course = appData.courses?.find(c => c.id == courseId);
-                if (!course) return 'on-track';
+                for (const courseObj of student.courses || []) {
+                    if (!courseObj || !courseObj.courseId) continue;
+                    
+                    const status = getStudentStatus(student, courseObj.courseId);
+                    
+                    if (status === statusFilter) {
+                        matchesStatus = true;
+                        break;
+                    }
+                }
                 
-                // Check if all units are completed
-                let allUnitsCompleted = true;
-                let totalTasksCompleted = 0;
-                let totalTasks = 0;
+                if (!matchesStatus) return;
+            }
+            
+            // Calculate overall progress with error handling
+            let overallProgress = 0;
+            let totalCourses = 0;
+            let status = 'not-started';
+            
+            for (const courseObj of student.courses || []) {
+                if (!courseObj || !courseObj.courseId) continue;
                 
-                for (const unitId in courseProgress?.units || {}) {
+                const courseId = courseObj.courseId;
+                const courseProgress = student.progress?.[courseId] || { units: {} };
+                let courseTasksCompleted = 0;
+                let courseTotalTasks = 0;
+                
+                for (const unitId in courseProgress.units || {}) {
                     const unitProgress = courseProgress.units[unitId];
-                    if (unitProgress?.completedTasks < unitProgress?.totalTasks) {
-                        allUnitsCompleted = false;
+                    if (unitProgress && typeof unitProgress === 'object') {
+                        courseTasksCompleted += Number(unitProgress.completedTasks) || 0;
+                        courseTotalTasks += Number(unitProgress.totalTasks) || 0;
                     }
-                    totalTasksCompleted += unitProgress?.completedTasks || 0;
-                    totalTasks += unitProgress?.totalTasks || 0;
                 }
                 
-                if (allUnitsCompleted && totalTasks > 0) return 'completed';
+                if (courseTotalTasks > 0) {
+                    overallProgress += (courseTasksCompleted / courseTotalTasks) * 100;
+                    totalCourses++;
+                }
                 
-                // Calculate progress with actual dates
-                const progressPercentage = totalTasks > 0 ? (totalTasksCompleted / totalTasks) * 100 : 0;
-                const weeksElapsed = getWeeksElapsed(courseId, student, courseProgress?.lastActivity);
-                const expectedProgress = (weeksElapsed / course.duration) * 100;
+                const courseStatus = getStudentStatus(student, courseId);
+                if (courseStatus === 'at-risk') {
+                    status = 'at-risk';
+                } else if (courseStatus === 'behind' && status !== 'at-risk') {
+                    status = 'behind';
+                } else if (courseStatus === 'on-track' && status === 'not-started') {
+                    status = 'on-track';
+                } else if (courseStatus === 'completed' && status === 'not-started') {
+                    status = 'completed';
+                }
+            }
+            
+            overallProgress = totalCourses > 0 ? Math.round(overallProgress / totalCourses) : 0;
+            
+            // Get enrolled courses names safely
+            const enrolledCourses = student.courses
+                ?.map(courseObj => {
+                    if (!courseObj || !courseObj.courseId) return '';
+                    const course = appData.courses?.find(c => c && c.id === courseObj.courseId);
+                    return course ? course.code : '';
+                })
+                .filter(name => name)
+                .join(', ') || 'None';
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${student.id || 'N/A'}</td>
+                <td>${fullName}</td>
+                <td>${student.email || 'N/A'}</td>
+                <td>${enrolledCourses}</td>
+                <td>
+                    <button class="btn" data-student-id="${student.id}" data-action="edit">Edit</button>
+                    <button class="btn btn-danger" data-student-id="${student.id}" data-action="delete">Delete</button>
+                    <button class="btn" data-student-id="${student.id}" data-action="view">View</button>
+                </td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Show message if no students match filters
+        if (tbody.children.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5">No students match the current filters</td></tr>';
+        }
+        
+    } catch (e) {
+        console.error('Error rendering students:', e);
+        const tbody = studentsTable.querySelector('tbody');
+        if (tbody) {
+            tbody.innerHTML = '<tr><td colspan="5">Error loading students</td></tr>';
+        }
+    }
+}
+        
+function getStudentStatus(student, courseId) {
+    try {
+        // 1. Validate inputs
+        if (!student || typeof student !== 'object') {
+            console.warn('Invalid student object provided to getStudentStatus');
+            return 'not-started';
+        }
+        
+        if (!courseId || isNaN(parseInt(courseId))) {
+            console.warn('Invalid courseId provided to getStudentStatus:', courseId);
+            return 'not-started';
+        }
+        
+        // 2. Check if student is enrolled in this course
+        const isEnrolled = student.courses?.some(c => c.courseId == courseId);
+        if (!isEnrolled) {
+            return 'not-started';
+        }
+        
+        // 3. Safely access progress data
+        const courseProgress = student.progress?.[courseId];
+        if (!courseProgress || !courseProgress.units || Object.keys(courseProgress.units).length === 0) {
+            return 'not-started';
+        }
+        
+        // 4. Find course with validation
+        const course = appData.courses?.find(c => c.id == courseId);
+        if (!course) {
+            console.warn(`Course ${courseId} not found for student ${student.id}`);
+            return 'on-track'; // Default to safe status
+        }
+        
+        // 5. Calculate completion with null checks
+        let allUnitsCompleted = true;
+        let totalTasksCompleted = 0;
+        let totalTasks = 0;
+        let hasAnyProgress = false;
+        
+        for (const unitId in courseProgress.units) {
+            const unitProgress = courseProgress.units[unitId];
+            
+            // Skip if unitProgress is invalid
+            if (!unitProgress || typeof unitProgress !== 'object') continue;
+            
+            const completed = Number(unitProgress.completedTasks) || 0;
+            const total = Number(unitProgress.totalTasks) || 0;
+            
+            if (total > 0) {
+                totalTasksCompleted += completed;
+                totalTasks += total;
+                hasAnyProgress = true;
                 
-                if (progressPercentage < expectedProgress - 20) return 'at-risk';
-                if (progressPercentage < expectedProgress - 10) return 'behind';
-                return 'on-track';
-            } catch (e) {
-                console.error('Error getting student status:', e);
-                return 'on-track';
+                if (completed < total) {
+                    allUnitsCompleted = false;
+                }
             }
         }
         
-        function formatStatus(status) {
-            switch(status) {
-                case 'on-track': return 'On Track';
-                case 'behind': return 'Behind';
-                case 'at-risk': return 'At Risk';
-                case 'completed': return 'Completed';
-                default: return status;
-            }
+        // 6. Handle case with no valid progress data
+        if (!hasAnyProgress || totalTasks === 0) {
+            return 'not-started';
         }
         
-        function getStatusBadgeClass(status) {
-            switch(status) {
-                case 'on-track': return 'badge-success';
-                case 'behind': return 'badge-warning';
-                case 'at-risk': return 'badge-danger';
-                case 'completed': return 'badge-success';
-                default: return '';
-            }
+        // 7. Check for completion
+        if (allUnitsCompleted && totalTasks > 0) {
+            return 'completed';
         }
         
+        // 8. Calculate progress percentage safely
+        const progressPercentage = (totalTasksCompleted / totalTasks) * 100;
+        
+        // 9. Get elapsed time with error handling
+        const weeksElapsed = getWeeksElapsed(courseId, student, courseProgress.lastActivity);
+        
+        // Ensure valid duration
+        const courseDuration = Number(course.duration) || 12; // Default to 12 weeks if invalid
+        if (courseDuration <= 0) {
+            console.warn(`Invalid course duration for course ${courseId}: ${course.duration}`);
+            return progressPercentage > 0 ? 'in-progress' : 'not-started';
+        }
+        
+        // 10. Calculate expected progress with bounds
+        const expectedProgress = Math.min(100, Math.max(0, (weeksElapsed / courseDuration) * 100));
+        
+        // 11. Determine status with safe thresholds
+        if (progressPercentage < Math.max(0, expectedProgress - 20)) {
+            return 'at-risk';
+        }
+        if (progressPercentage < Math.max(0, expectedProgress - 10)) {
+            return 'behind';
+        }
+        
+        return progressPercentage > 0 ? 'on-track' : 'not-started';
+        
+    } catch (e) {
+        console.error('Error getting student status for student', student?.id, 'course', courseId, ':', e);
+        return 'not-started'; // Safe default
+    }
+}
+
+function formatStatus(status) {
+    switch(status) {
+        case 'on-track': return 'On Track';
+        case 'behind': return 'Behind';
+        case 'at-risk': return 'At Risk';
+        case 'completed': return 'Completed';
+        case 'not-started': return 'Not Started';
+        case 'in-progress': return 'In Progress';
+        default: return status || 'Unknown';
+    }
+}
+
+function getStatusBadgeClass(status) {
+    switch(status) {
+        case 'on-track': return 'badge-success';
+        case 'behind': return 'badge-warning';
+        case 'at-risk': return 'badge-danger';
+        case 'completed': return 'badge-success';
+        case 'not-started': return 'badge-info';
+        case 'in-progress': return 'badge-info';
+        default: return 'badge-info';
+    }
+}
         // Render courses
         function renderCourses() {
             try {
@@ -1740,444 +1880,548 @@
             }
         }
         
-        // NEW: Render analytics for reverse look-up - FIXED VERSION
-        function renderAnalytics() {
-            try {
-                // Populate course filter for analytics
-                const analyticsCourseFilter = document.getElementById('analytics-course-filter');
-                if (analyticsCourseFilter) {
-                    analyticsCourseFilter.innerHTML = '<option value="">All Courses</option>';
-                    appData.courses?.forEach(course => {
+        // NEW: Render analytics for reverse look-up - FIXED VERSION// NEW: Render analytics for reverse look-up - FIXED VERSION// NEW: Render analytics for reverse look-up - FIXED VERSION
+function renderAnalytics() {
+    try {
+        // Check if we're on the analytics tab
+        const analyticsTab = document.getElementById('analytics');
+        if (!analyticsTab || !analyticsTab.classList.contains('active')) {
+            return; // Don't render if tab isn't active
+        }
+        
+        // Populate course filter for analytics
+        const analyticsCourseFilter = document.getElementById('analytics-course-filter');
+        if (analyticsCourseFilter) {
+            const currentCourseValue = analyticsCourseFilter.value; // Save current selection
+            analyticsCourseFilter.innerHTML = '<option value="">All Courses</option>';
+            (appData.courses || []).forEach(course => {
+                if (course && course.id && course.code && course.name) {
+                    const option = document.createElement('option');
+                    option.value = course.id;
+                    option.textContent = `${course.code} - ${course.name}`;
+                    analyticsCourseFilter.appendChild(option);
+                }
+            });
+            analyticsCourseFilter.value = currentCourseValue; // Restore selection
+        }
+        
+        // Populate unit filter for analytics
+        const analyticsUnitFilter = document.getElementById('analytics-unit-filter');
+        if (analyticsUnitFilter) {
+            const currentUnitValue = analyticsUnitFilter.value; // Save current selection
+            analyticsUnitFilter.innerHTML = '<option value="">All Units</option>';
+            (appData.courses || []).forEach(course => {
+                (course.units || []).forEach(unit => {
+                    if (unit && unit.id && unit.code) {
                         const option = document.createElement('option');
-                        option.value = course.id;
-                        option.textContent = `${course.code} - ${course.name}`;
-                        analyticsCourseFilter.appendChild(option);
-                    });
-                }
-                
-                // Populate unit filter for analytics
-                const analyticsUnitFilter = document.getElementById('analytics-unit-filter');
-                if (analyticsUnitFilter) {
-                    analyticsUnitFilter.innerHTML = '<option value="">All Units</option>';
-                    appData.courses?.forEach(course => {
-                        course.units?.forEach(unit => {
-                            const option = document.createElement('option');
-                            option.value = `${course.id}-${unit.id}`;
-                            option.textContent = `${course.code} - ${unit.code}`;
-                            analyticsUnitFilter.appendChild(option);
-                        });
-                    });
-                }
-                
-                // Populate task filter for analytics
-                const analyticsTaskFilter = document.getElementById('analytics-task-filter');
-                if (analyticsTaskFilter) {
-                    analyticsTaskFilter.innerHTML = '<option value="">All Tasks</option>';
-                    appData.courses?.forEach(course => {
-                        course.units?.forEach(unit => {
-                            unit.tasks?.forEach(task => {
-                                const option = document.createElement('option');
-                                option.value = `${course.id}-${unit.id}-${task.id}`;
-                                option.textContent = `${course.code} - ${unit.code} - ${task.name}`;
-                                analyticsTaskFilter.appendChild(option);
-                            });
-                        });
-                    });
-                }
-                
-                // Render unit completion overview
-                renderUnitCompletionOverview();
-                
-                // Render task completion tracking
-                renderTaskCompletionTracking();
-                
-                // Render progress analytics
-                renderProgressAnalytics();
-            } catch (e) {
-                console.error('Error rendering analytics:', e);
-            }
-        }
-        
-        // NEW: Render unit completion overview - FIXED VERSION
-        function renderUnitCompletionOverview() {
-            try {
-                const unitCompletionContainer = document.getElementById('unit-completion-container');
-                if (!unitCompletionContainer) return;
-                
-                unitCompletionContainer.innerHTML = '';
-                
-                const selectedCourseId = document.getElementById('analytics-course-filter').value;
-                
-                appData.courses?.forEach(course => {
-                    if (selectedCourseId && course.id != selectedCourseId) return;
-                    
-                    course.units?.forEach(unit => {
-                        // Calculate completion statistics for this unit
-                        const enrolledStudents = appData.students.filter(student => 
-                            student.courses?.some(c => c.courseId === course.id && c.units?.includes(unit.id))
-                        );
-                        
-                        const completedStudents = enrolledStudents.filter(student => {
-                            const unitProgress = student.progress?.[course.id]?.units?.[unit.id];
-                            return unitProgress && unitProgress.completedTasks === unitProgress.totalTasks;
-                        });
-                        
-                        const completionRate = enrolledStudents.length > 0 
-                            ? Math.round((completedStudents.length / enrolledStudents.length) * 100) 
-                            : 0;
-                        
-                        const unitCard = document.createElement('div');
-                        unitCard.className = 'card unit-completion-card';
-                        unitCard.setAttribute('data-course-id', course.id);
-                        unitCard.setAttribute('data-unit-id', unit.id);
-                        unitCard.innerHTML = `
-                            <h3>${unit.code} - ${unit.name}</h3>
-                            <p><strong>Course:</strong> ${course.code}</p>
-                            <p><strong>Completion Rate:</strong> ${completionRate}%</p>
-                            <p><strong>Completed:</strong> ${completedStudents.length} of ${enrolledStudents.length} students</p>
-                            <div class="progress-bar">
-                                <div class="progress" style="width: ${completionRate}%"></div>
-                            </div>
-                            <div style="margin-top: 10px;">
-                                <button class="btn btn-sm view-unit-completion-btn">View Details</button>
-                            </div>
-                        `;
-                        
-                        unitCompletionContainer.appendChild(unitCard);
-                    });
-                });
-                
-                // Add event listeners to unit completion cards
-                document.querySelectorAll('.view-unit-completion-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const card = this.closest('.unit-completion-card');
-                        const courseId = parseInt(card.getAttribute('data-course-id'));
-                        const unitId = parseInt(card.getAttribute('data-unit-id'));
-                        showUnitCompletionDetails(courseId, unitId);
-                    });
-                });
-            } catch (e) {
-                console.error('Error rendering unit completion overview:', e);
-            }
-        }
-        
-        // NEW: Show unit completion details - FIXED VERSION
-        function showUnitCompletionDetails(courseId, unitId) {
-            try {
-                const course = appData.courses?.find(c => c.id === courseId);
-                const unit = course?.units?.find(u => u.id === unitId);
-                
-                if (!course || !unit) return;
-                
-                document.getElementById('unit-completion-title').textContent = 
-                    `Unit Completion: ${unit.code} - ${unit.name}`;
-                
-                const content = document.getElementById('unit-completion-content');
-                content.innerHTML = '';
-                
-                // Get students enrolled in this unit
-                const enrolledStudents = appData.students.filter(student => 
-                    student.courses?.some(c => c.courseId === courseId && c.units?.includes(unitId))
-                );
-                
-                // Calculate completion statistics
-                const completedStudents = enrolledStudents.filter(student => {
-                    const unitProgress = student.progress?.[courseId]?.units?.[unitId];
-                    return unitProgress && unitProgress.completedTasks === unitProgress.totalTasks;
-                });
-                
-                const inProgressStudents = enrolledStudents.filter(student => {
-                    const unitProgress = student.progress?.[courseId]?.units?.[unitId];
-                    return unitProgress && 
-                           unitProgress.completedTasks > 0 && 
-                           unitProgress.completedTasks < unitProgress.totalTasks;
-                });
-                
-                const notStartedStudents = enrolledStudents.filter(student => {
-                    const unitProgress = student.progress?.[courseId]?.units?.[unitId];
-                    return !unitProgress || unitProgress.completedTasks === 0;
-                });
-                
-                // Add summary statistics
-                const summaryHTML = `
-                    <div class="analytics-grid" style="margin-bottom: 20px;">
-                        <div class="analytics-card">
-                            <div class="analytics-value">${enrolledStudents.length}</div>
-                            <div class="analytics-label">Total Students</div>
-                        </div>
-                        <div class="analytics-card">
-                            <div class="analytics-value">${completedStudents.length}</div>
-                            <div class="analytics-label">Completed</div>
-                        </div>
-                        <div class="analytics-card">
-                            <div class="analytics-value">${inProgressStudents.length}</div>
-                            <div class="analytics-label">In Progress</div>
-                        </div>
-                        <div class="analytics-card">
-                            <div class="analytics-value">${notStartedStudents.length}</div>
-                            <div class="analytics-label">Not Started</div>
-                        </div>
-                    </div>
-                `;
-                
-                content.innerHTML += summaryHTML;
-                
-                // Add student completion details
-                let detailsHTML = `
-                    <h3>Student Completion Details</h3>
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Student</th>
-                                <th>Progress</th>
-                                <th>Status</th>
-                                <th>Last Activity</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                enrolledStudents.forEach(student => {
-                    const unitProgress = student.progress?.[courseId]?.units?.[unitId] || 
-                                        { completedTasks: 0, totalTasks: unit.tasks?.length || 0 };
-                    
-                    const progressPercentage = unitProgress.totalTasks > 0 
-                        ? Math.round((unitProgress.completedTasks / unitProgress.totalTasks) * 100) 
-                        : 0;
-                    
-                    let status = 'Not Started';
-                    if (progressPercentage === 100) {
-                        status = 'Completed';
-                    } else if (progressPercentage > 0) {
-                        status = 'In Progress';
+                        option.value = `${course.id}-${unit.id}`;
+                        option.textContent = `${course.code} - ${unit.code}`;
+                        analyticsUnitFilter.appendChild(option);
                     }
-                    
-                    detailsHTML += `
-                        <tr>
-                            <td>${student.firstName} ${student.lastName}</td>
-                            <td>
-                                ${unitProgress.completedTasks}/${unitProgress.totalTasks} (${progressPercentage}%)
-                                <div class="progress-bar">
-                                    <div class="progress" style="width: ${progressPercentage}%"></div>
-                                </div>
-                            </td>
-                            <td><span class="badge ${status === 'Completed' ? 'badge-success' : status === 'In Progress' ? 'badge-warning' : 'badge-danger'}">${status}</span></td>
-                            <td>${unitProgress.lastActivity || 'No activity'}</td>
-                        </tr>
-                    `;
                 });
-                
-                detailsHTML += '</tbody></table>';
-                content.innerHTML += detailsHTML;
-                
-                // Show the modal
-                const unitCompletionModal = document.getElementById('unit-completion-modal');
-                if (unitCompletionModal) {
-                    unitCompletionModal.style.display = 'block';
-                }
-            } catch (e) {
-                console.error('Error showing unit completion details:', e);
-            }
+            });
+            analyticsUnitFilter.value = currentUnitValue; // Restore selection
         }
         
-        // NEW: Render task completion tracking - FIXED VERSION
-        function renderTaskCompletionTracking() {
-            try {
-                const taskCompletionContainer = document.getElementById('task-completion-container');
-                if (!taskCompletionContainer) return;
-                
-                taskCompletionContainer.innerHTML = '';
-                
-                const selectedCourseId = document.getElementById('analytics-course-filter').value;
-                const selectedUnitTask = document.getElementById('analytics-task-filter').value;
-                
-                let tasksToShow = [];
-                
-                // Collect all tasks based on filters
-                appData.courses?.forEach(course => {
-                    if (selectedCourseId && course.id != selectedCourseId) return;
-                    
-                    course.units?.forEach(unit => {
-                        unit.tasks?.forEach(task => {
-                            if (selectedUnitTask && `${course.id}-${unit.id}-${task.id}` !== selectedUnitTask) return;
-                            
-                            tasksToShow.push({
-                                course,
-                                unit,
-                                task
-                            });
-                        });
-                    });
-                });
-                
-                if (tasksToShow.length === 0) {
-                    taskCompletionContainer.innerHTML = '<p>No tasks found for the selected filters.</p>';
-                    return;
-                }
-                
-                tasksToShow.forEach(({ course, unit, task }) => {
-                    // Calculate completion statistics for this task
-                    const enrolledStudents = appData.students.filter(student => 
-                        student.courses?.some(c => c.courseId === course.id && c.units?.includes(unit.id))
-                    );
-                    
-                    const completedStudents = enrolledStudents.filter(student => 
-                        student.taskStatus?.[course.id]?.[unit.id]?.[task.id] === 'completed'
-                    );
-                    
-                    const completionRate = enrolledStudents.length > 0 
-                        ? Math.round((completedStudents.length / enrolledStudents.length) * 100) 
-                        : 0;
-                    
-                    const taskCard = document.createElement('div');
-                    taskCard.className = 'card';
-                    taskCard.style.marginBottom = '15px';
-                    taskCard.innerHTML = `
-                        <h3>${task.name}</h3>
-                        <p><strong>Unit:</strong> ${unit.code} - ${unit.name}</p>
-                        <p><strong>Course:</strong> ${course.code}</p>
-                        <p><strong>Completion Rate:</strong> ${completionRate}%</p>
-                        <p><strong>Completed:</strong> ${completedStudents.length} of ${enrolledStudents.length} students</p>
-                        <div class="progress-bar">
-                            <div class="progress" style="width: ${completionRate}%"></div>
-                        </div>
-                        <div class="students-completion-list">
-                            <h4>Students who completed this task:</h4>
-                            ${completedStudents.length > 0 
-                                ? completedStudents.map(student => 
-                                    `<div class="student-completion-item">
-                                        <span>${student.firstName} ${student.lastName}</span>
-                                        <span class="completion-rate">Completed</span>
-                                    </div>`
-                                  ).join('')
-                                : '<p>No students have completed this task yet.</p>'
-                            }
-                        </div>
-                    `;
-                    
-                    taskCompletionContainer.appendChild(taskCard);
-                });
-            } catch (e) {
-                console.error('Error rendering task completion tracking:', e);
-            }
-        }
-        
-        // NEW: Render progress analytics - FIXED VERSION
-        function renderProgressAnalytics() {
-            try {
-                const progressAnalyticsContainer = document.getElementById('progress-analytics-container');
-                if (!progressAnalyticsContainer) return;
-                
-                progressAnalyticsContainer.innerHTML = '';
-                
-                const selectedCourseId = document.getElementById('analytics-course-filter').value;
-                
-                // Calculate overall statistics
-                let totalStudents = appData.students.length;
-                let totalCourses = appData.courses.length;
-                let totalUnits = 0;
-                let totalTasks = 0;
-                
-                appData.courses?.forEach(course => {
-                    if (selectedCourseId && course.id != selectedCourseId) return;
-                    
-                    totalUnits += course.units?.length || 0;
-                    course.units?.forEach(unit => {
-                        totalTasks += unit.tasks?.length || 0;
-                    });
-                });
-                
-                // Calculate completion rates
-                let completedStudents = 0;
-                let completedCourses = 0;
-                let completedUnits = 0;
-                let completedTasks = 0;
-                
-                appData.students?.forEach(student => {
-                    let studentCompletedAll = true;
-                    
-                    student.courses?.forEach(courseObj => {
-                        if (selectedCourseId && courseObj.courseId != selectedCourseId) return;
-                        
-                        const course = appData.courses?.find(c => c.id === courseObj.courseId);
-                        if (!course) return;
-                        
-                        let courseCompleted = true;
-                        
-                        courseObj.units?.forEach(unitId => {
-                            const unitProgress = student.progress?.[course.id]?.units?.[unitId];
-                            if (unitProgress) {
-                                if (unitProgress.completedTasks === unitProgress.totalTasks) {
-                                    completedUnits++;
-                                } else {
-                                    courseCompleted = false;
-                                    studentCompletedAll = false;
-                                }
-                                
-                                completedTasks += unitProgress.completedTasks;
-                            } else {
-                                courseCompleted = false;
-                                studentCompletedAll = false;
-                            }
-                        });
-                        
-                        if (courseCompleted) {
-                            completedCourses++;
+        // Populate task filter for analytics
+        const analyticsTaskFilter = document.getElementById('analytics-task-filter');
+        if (analyticsTaskFilter) {
+            const currentTaskValue = analyticsTaskFilter.value; // Save current selection
+            analyticsTaskFilter.innerHTML = '<option value="">All Tasks</option>';
+            (appData.courses || []).forEach(course => {
+                (course.units || []).forEach(unit => {
+                    (unit.tasks || []).forEach(task => {
+                        if (task && task.id && task.name) {
+                            const option = document.createElement('option');
+                            option.value = `${course.id}-${unit.id}-${task.id}`;
+                            option.textContent = `${course.code} - ${unit.code} - ${task.name}`;
+                            analyticsTaskFilter.appendChild(option);
                         }
                     });
-                    
-                    if (studentCompletedAll) {
-                        completedStudents++;
-                    }
                 });
-                
-                // Create analytics cards
-                const analyticsCards = [
-                    {
-                        label: 'Student Completion Rate',
-                        value: totalStudents > 0 ? Math.round((completedStudents / totalStudents) * 100) : 0,
-                        suffix: '%'
-                    },
-                    {
-                        label: 'Course Completion Rate',
-                        value: totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0,
-                        suffix: '%'
-                    },
-                    {
-                        label: 'Unit Completion Rate',
-                        value: totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0,
-                        suffix: '%'
-                    },
-                    {
-                        label: 'Task Completion Rate',
-                        value: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
-                        suffix: '%'
-                    },
-                    {
-                        label: 'Average Progress',
-                        value: calculateAverageProgress(selectedCourseId),
-                        suffix: '%'
-                    },
-                    {
-                        label: 'At Risk Students',
-                        value: calculateAtRiskStudents(selectedCourseId),
-                        suffix: ''
-                    }
-                ];
-                
-                analyticsCards.forEach(card => {
-                    const analyticsCard = document.createElement('div');
-                    analyticsCard.className = 'analytics-card';
-                    analyticsCard.innerHTML = `
-                        <div class="analytics-value">${card.value}${card.suffix}</div>
-                        <div class="analytics-label">${card.label}</div>
-                    `;
-                    progressAnalyticsContainer.appendChild(analyticsCard);
-                });
-            } catch (e) {
-                console.error('Error rendering progress analytics:', e);
-            }
+            });
+            analyticsTaskFilter.value = currentTaskValue; // Restore selection
         }
+        
+        // Render all analytics sections
+        renderUnitCompletionOverview();
+        renderTaskCompletionTracking();
+        renderProgressAnalytics();
+        
+    } catch (e) {
+        console.error('Error rendering analytics:', e);
+    }
+}
+
+// NEW: Render unit completion overview - FIXED VERSION
+function renderUnitCompletionOverview() {
+    try {
+        const unitCompletionContainer = document.getElementById('unit-completion-container');
+        if (!unitCompletionContainer) {
+            console.warn('Unit completion container not found');
+            return;
+        }
+        
+        unitCompletionContainer.innerHTML = '';
+        
+        const selectedCourseId = document.getElementById('analytics-course-filter')?.value || '';
+        const selectedUnitId = document.getElementById('analytics-unit-filter')?.value || '';
+        
+        // Track unique units to avoid duplicates
+        const uniqueUnits = new Map();
+        
+        // First, collect all unique units across all courses
+        (appData.courses || []).forEach(course => {
+            if (selectedCourseId && course.id != selectedCourseId) return;
+            
+            (course.units || []).forEach(unit => {
+                if (!unit || !unit.id || !unit.code || !unit.name) return;
+                
+                const unitKey = `${unit.code}-${unit.name}`;
+                
+                // If unit filter is selected, only include matching units
+                if (selectedUnitId && `${course.id}-${unit.id}` !== selectedUnitId) return;
+                
+                if (!uniqueUnits.has(unitKey)) {
+                    uniqueUnits.set(unitKey, {
+                        unit: unit,
+                        courses: [course],
+                        enrolledStudents: [],
+                        completedStudents: []
+                    });
+                } else {
+                    // Unit already exists, just add this course to the list
+                    const existingUnit = uniqueUnits.get(unitKey);
+                    if (!existingUnit.courses.some(c => c.id === course.id)) {
+                        existingUnit.courses.push(course);
+                    }
+                }
+            });
+        });
+        
+        // Now calculate statistics for each unique unit
+        uniqueUnits.forEach((unitData, unitKey) => {
+            const { unit, courses } = unitData;
+            
+            // Get all students enrolled in this unit across any course
+            unitData.enrolledStudents = (appData.students || []).filter(student => 
+                student && student.courses && student.courses.some(c => 
+                    c && courses.some(course => course.id === c.courseId) && 
+                    c.units && c.units.includes(unit.id)
+                )
+            );
+            
+            // Get students who completed this unit
+            unitData.completedStudents = unitData.enrolledStudents.filter(student => {
+                for (const course of courses) {
+                    const unitProgress = student.progress?.[course.id]?.units?.[unit.id];
+                    if (unitProgress && unitProgress.completedTasks === unitProgress.totalTasks) {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            const completionRate = unitData.enrolledStudents.length > 0 
+                ? Math.round((unitData.completedStudents.length / unitData.enrolledStudents.length) * 100) 
+                : 0;
+            
+            const unitCard = document.createElement('div');
+            unitCard.className = 'card unit-completion-card';
+            unitCard.setAttribute('data-unit-key', unitKey);
+            unitCard.innerHTML = `
+                <h3>${unit.code} - ${unit.name}</h3>
+                <p><strong>Courses:</strong> ${courses.map(c => c.code).join(', ')}</p>
+                <p><strong>Completion Rate:</strong> ${completionRate}%</p>
+                <p><strong>Completed:</strong> ${unitData.completedStudents.length} of ${unitData.enrolledStudents.length} students</p>
+                <div class="progress-bar">
+                    <div class="progress" style="width: ${completionRate}%"></div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <button class="btn btn-sm view-unit-completion-btn">View Details</button>
+                </div>
+            `;
+            
+            unitCompletionContainer.appendChild(unitCard);
+        });
+        
+        // Add event listeners to unit completion cards
+        document.querySelectorAll('.view-unit-completion-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const card = this.closest('.unit-completion-card');
+                const unitKey = card.getAttribute('data-unit-key');
+                const unitData = uniqueUnits.get(unitKey);
+                
+                if (unitData) {
+                    showUnitCompletionDetails(unitData);
+                }
+            });
+        });
+        
+        // Show message if no units found
+        if (unitCompletionContainer.children.length === 0) {
+            unitCompletionContainer.innerHTML = '<p>No units found for the selected filters.</p>';
+        }
+        
+    } catch (e) {
+        console.error('Error rendering unit completion overview:', e);
+    }
+}
+
+// NEW: Show unit completion details - FIXED VERSION
+function showUnitCompletionDetails(unitData) {
+    try {
+        const { unit, courses, enrolledStudents, completedStudents } = unitData;
+        
+        const unitCompletionModal = document.getElementById('unit-completion-modal');
+        const unitCompletionTitle = document.getElementById('unit-completion-title');
+        const unitCompletionContent = document.getElementById('unit-completion-content');
+        
+        if (!unitCompletionModal || !unitCompletionTitle || !unitCompletionContent) {
+            console.warn('Unit completion modal elements not found');
+            return;
+        }
+        
+        unitCompletionTitle.textContent = `Unit Completion: ${unit.code} - ${unit.name}`;
+        unitCompletionContent.innerHTML = '';
+        
+        // Calculate completion statistics
+        const inProgressStudents = enrolledStudents.filter(student => {
+            for (const course of courses) {
+                const unitProgress = student.progress?.[course.id]?.units?.[unit.id];
+                if (unitProgress && 
+                    unitProgress.completedTasks > 0 && 
+                    unitProgress.completedTasks < unitProgress.totalTasks) {
+                    return true;
+                }
+            }
+            return false;
+        });
+        
+        const notStartedStudents = enrolledStudents.filter(student => {
+            for (const course of courses) {
+                const unitProgress = student.progress?.[course.id]?.units?.[unit.id];
+                if (unitProgress && unitProgress.completedTasks > 0) {
+                    return false;
+                }
+            }
+            return true;
+        });
+        
+        // Add summary statistics
+        const summaryHTML = `
+            <div class="analytics-grid" style="margin-bottom: 20px;">
+                <div class="analytics-card">
+                    <div class="analytics-value">${enrolledStudents.length}</div>
+                    <div class="analytics-label">Total Students</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-value">${completedStudents.length}</div>
+                    <div class="analytics-label">Completed</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-value">${inProgressStudents.length}</div>
+                    <div class="analytics-label">In Progress</div>
+                </div>
+                <div class="analytics-card">
+                    <div class="analytics-value">${notStartedStudents.length}</div>
+                    <div class="analytics-label">Not Started</div>
+                </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <h4>Available in Courses:</h4>
+                <p>${courses.map(course => `${course.code} - ${course.name}`).join(', ')}</p>
+            </div>
+        `;
+        
+        unitCompletionContent.innerHTML += summaryHTML;
+        
+        // Add student completion details
+        let detailsHTML = `
+            <h3>Student Completion Details</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Course</th>
+                        <th>Progress</th>
+                        <th>Status</th>
+                        <th>Last Activity</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        
+        enrolledStudents.forEach(student => {
+            if (!student) return;
+            
+            let bestProgress = { completedTasks: 0, totalTasks: 0, lastActivity: null, course: null };
+            
+            // Find the best progress across all courses for this unit
+            courses.forEach(course => {
+                const unitProgress = student.progress?.[course.id]?.units?.[unit.id];
+                if (unitProgress) {
+                    if (unitProgress.completedTasks > bestProgress.completedTasks) {
+                        bestProgress = {
+                            completedTasks: unitProgress.completedTasks || 0,
+                            totalTasks: unitProgress.totalTasks || 0,
+                            lastActivity: unitProgress.lastActivity,
+                            course: course
+                        };
+                    }
+                }
+            });
+            
+            const progressPercentage = bestProgress.totalTasks > 0 
+                ? Math.round((bestProgress.completedTasks / bestProgress.totalTasks) * 100) 
+                : 0;
+            
+            let status = 'Not Started';
+            if (progressPercentage === 100) {
+                status = 'Completed';
+            } else if (progressPercentage > 0) {
+                status = 'In Progress';
+            }
+            
+            detailsHTML += `
+                <tr>
+                    <td>${student.firstName || ''} ${student.lastName || ''}</td>
+                    <td>${bestProgress.course ? bestProgress.course.code : 'N/A'}</td>
+                    <td>
+                        ${bestProgress.completedTasks}/${bestProgress.totalTasks} (${progressPercentage}%)
+                        <div class="progress-bar">
+                            <div class="progress" style="width: ${progressPercentage}%"></div>
+                        </div>
+                    </td>
+                    <td><span class="badge ${status === 'Completed' ? 'badge-success' : status === 'In Progress' ? 'badge-warning' : 'badge-info'}">${status}</span></td>
+                    <td>${bestProgress.lastActivity || 'No activity'}</td>
+                </tr>
+            `;
+        });
+        
+        detailsHTML += '</tbody></table>';
+        unitCompletionContent.innerHTML += detailsHTML;
+        
+        // Show the modal
+        unitCompletionModal.style.display = 'block';
+        
+    } catch (e) {
+        console.error('Error showing unit completion details:', e);
+    }
+}
+
+// NEW: Render task completion tracking - FIXED VERSION
+function renderTaskCompletionTracking() {
+    try {
+        const taskCompletionContainer = document.getElementById('task-completion-container');
+        if (!taskCompletionContainer) {
+            console.warn('Task completion container not found');
+            return;
+        }
+        
+        taskCompletionContainer.innerHTML = '';
+        
+        const selectedCourseId = document.getElementById('analytics-course-filter')?.value || '';
+        const selectedUnitTask = document.getElementById('analytics-task-filter')?.value || '';
+        
+        let tasksToShow = [];
+        
+        // Collect all tasks based on filters
+        (appData.courses || []).forEach(course => {
+            if (selectedCourseId && course.id != selectedCourseId) return;
+            
+            (course.units || []).forEach(unit => {
+                (unit.tasks || []).forEach(task => {
+                    if (selectedUnitTask && `${course.id}-${unit.id}-${task.id}` !== selectedUnitTask) return;
+                    
+                    tasksToShow.push({
+                        course,
+                        unit,
+                        task
+                    });
+                });
+            });
+        });
+        
+        if (tasksToShow.length === 0) {
+            taskCompletionContainer.innerHTML = '<p>No tasks found for the selected filters.</p>';
+            return;
+        }
+        
+        tasksToShow.forEach(({ course, unit, task }) => {
+            if (!course || !unit || !task) return;
+            
+            // Calculate completion statistics for this task
+            const enrolledStudents = (appData.students || []).filter(student => 
+                student && student.courses && student.courses.some(c => 
+                    c && c.courseId === course.id && c.units && c.units.includes(unit.id)
+                )
+            );
+            
+            const completedStudents = enrolledStudents.filter(student => 
+                student.taskStatus?.[course.id]?.[unit.id]?.[task.id] === 'completed'
+            );
+            
+            const completionRate = enrolledStudents.length > 0 
+                ? Math.round((completedStudents.length / enrolledStudents.length) * 100) 
+                : 0;
+            
+            const taskCard = document.createElement('div');
+            taskCard.className = 'card';
+            taskCard.style.marginBottom = '15px';
+            taskCard.innerHTML = `
+                <h3>${task.name}</h3>
+                <p><strong>Unit:</strong> ${unit.code} - ${unit.name}</p>
+                <p><strong>Course:</strong> ${course.code}</p>
+                <p><strong>Completion Rate:</strong> ${completionRate}%</p>
+                <p><strong>Completed:</strong> ${completedStudents.length} of ${enrolledStudents.length} students</p>
+                <div class="progress-bar">
+                    <div class="progress" style="width: ${completionRate}%"></div>
+                </div>
+                <div class="students-completion-list">
+                    <h4>Students who completed this task:</h4>
+                    ${completedStudents.length > 0 
+                        ? completedStudents.map(student => 
+                            `<div class="student-completion-item">
+                                <span>${student.firstName || ''} ${student.lastName || ''}</span>
+                                <span class="completion-rate">Completed</span>
+                            </div>`
+                          ).join('')
+                        : '<p>No students have completed this task yet.</p>'
+                    }
+                </div>
+            `;
+            
+            taskCompletionContainer.appendChild(taskCard);
+        });
+        
+    } catch (e) {
+        console.error('Error rendering task completion tracking:', e);
+    }
+}
+
+// NEW: Render progress analytics - FIXED VERSION
+function renderProgressAnalytics() {
+    try {
+        const progressAnalyticsContainer = document.getElementById('progress-analytics-container');
+        if (!progressAnalyticsContainer) {
+            console.warn('Progress analytics container not found');
+            return;
+        }
+        
+        progressAnalyticsContainer.innerHTML = '';
+        
+        const selectedCourseId = document.getElementById('analytics-course-filter')?.value || '';
+        
+        // Calculate overall statistics
+        let totalStudents = (appData.students || []).length;
+        let totalCourses = (appData.courses || []).length;
+        let totalUnits = 0;
+        let totalTasks = 0;
+        
+        (appData.courses || []).forEach(course => {
+            if (selectedCourseId && course.id != selectedCourseId) return;
+            
+            totalUnits += (course.units || []).length;
+            (course.units || []).forEach(unit => {
+                totalTasks += (unit.tasks || []).length;
+            });
+        });
+        
+        // Calculate completion rates
+        let completedStudents = 0;
+        let completedCourses = 0;
+        let completedUnits = 0;
+        let completedTasks = 0;
+        
+        (appData.students || []).forEach(student => {
+            if (!student) return;
+            
+            let studentCompletedAll = true;
+            
+            (student.courses || []).forEach(courseObj => {
+                if (selectedCourseId && courseObj.courseId != selectedCourseId) return;
+                
+                const course = (appData.courses || []).find(c => c.id === courseObj.courseId);
+                if (!course) return;
+                
+                let courseCompleted = true;
+                
+                (courseObj.units || []).forEach(unitId => {
+                    const unitProgress = student.progress?.[course.id]?.units?.[unitId];
+                    if (unitProgress) {
+                        if (unitProgress.completedTasks === unitProgress.totalTasks) {
+                            completedUnits++;
+                        } else {
+                            courseCompleted = false;
+                            studentCompletedAll = false;
+                        }
+                        
+                        completedTasks += (unitProgress.completedTasks || 0);
+                    } else {
+                        courseCompleted = false;
+                        studentCompletedAll = false;
+                    }
+                });
+                
+                if (courseCompleted) {
+                    completedCourses++;
+                }
+            });
+            
+            if (studentCompletedAll) {
+                completedStudents++;
+            }
+        });
+        
+        // Create analytics cards
+        const analyticsCards = [
+            {
+                label: 'Student Completion Rate',
+                value: totalStudents > 0 ? Math.round((completedStudents / totalStudents) * 100) : 0,
+                suffix: '%'
+            },
+            {
+                label: 'Course Completion Rate',
+                value: totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0,
+                suffix: '%'
+            },
+            {
+                label: 'Unit Completion Rate',
+                value: totalUnits > 0 ? Math.round((completedUnits / totalUnits) * 100) : 0,
+                suffix: '%'
+            },
+            {
+                label: 'Task Completion Rate',
+                value: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
+                suffix: '%'
+            },
+            {
+                label: 'Average Progress',
+                value: calculateAverageProgress(selectedCourseId),
+                suffix: '%'
+            },
+            {
+                label: 'At Risk Students',
+                value: calculateAtRiskStudents(selectedCourseId),
+                suffix: ''
+            }
+        ];
+        
+        analyticsCards.forEach(card => {
+            const analyticsCard = document.createElement('div');
+            analyticsCard.className = 'analytics-card';
+            analyticsCard.innerHTML = `
+                <div class="analytics-value">${card.value}${card.suffix}</div>
+                <div class="analytics-label">${card.label}</div>
+            `;
+            progressAnalyticsContainer.appendChild(analyticsCard);
+        });
+        
+    } catch (e) {
+        console.error('Error rendering progress analytics:', e);
+    }
+}
 
         // NEW: Calculate average progress
         function calculateAverageProgress(selectedCourseId = null) {
@@ -3884,679 +4128,672 @@
         }
         
         // Setup event listeners - UPDATED VERSION
-        function setupEventListeners() {
-            try {
-                // Close modals when clicking outside
-                document.querySelectorAll('.modal').forEach(modal => {
-                    modal.addEventListener('click', function(e) {
-                        if (e.target === this) {
-                            this.style.display = 'none';
-                        }
-                    });
-                });
-                
-                // Close modals when clicking close button
-                document.querySelectorAll('.close-modal').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        this.closest('.modal').style.display = 'none';
-                    });
-                });
-                
-                // Tab switching
-                tabs.forEach(tab => {
-                    tab.addEventListener('click', () => {
-                        tabs.forEach(t => t.classList.remove('active'));
-                        tabContents.forEach(c => c.classList.remove('active'));
-                        
-                        tab.classList.add('active');
-                        document.getElementById(tab.dataset.tab).classList.add('active');
-                    });
-                });
-                
-                // Chart toggle functionality
-                document.getElementById('cards-view-btn').addEventListener('click', function() {
-                    this.classList.add('active');
-                    document.getElementById('charts-view-btn').classList.remove('active');
-                    document.getElementById('cards-view').style.display = 'grid';
-                    document.getElementById('charts-view').classList.remove('active');
-                });
-                
-                document.getElementById('charts-view-btn').addEventListener('click', function() {
-                    this.classList.add('active');
-                    document.getElementById('cards-view-btn').classList.remove('active');
-                    document.getElementById('cards-view').style.display = 'none';
-                    document.getElementById('charts-view').classList.add('active');
-                    
-                    // Update charts with current data
-                    updateCharts();
-                });
-                
-                // Student modal
-                document.getElementById('add-student-btn').addEventListener('click', () => showStudentModal());
-                document.getElementById('cancel-student-btn').addEventListener('click', () => {
-                    studentModal.style.display = 'none';
-                });
-                
-                // Student table actions
-                document.getElementById('students-table').addEventListener('click', e => {
-                    if (e.target.tagName === 'BUTTON') {
-                        const studentId = parseInt(e.target.getAttribute('data-student-id'));
-                        const action = e.target.getAttribute('data-action');
-                        
-                        if (action === 'edit') {
-                            showStudentModal(studentId);
-                        } else if (action === 'delete') {
-                            deleteStudent(studentId);
-                        } else if (action === 'view') {
-                            showStudentDetails(studentId);
-                        }
-                    }
-                });
-                
-                // Generate summary button
-                document.getElementById('generate-summary-btn').addEventListener('click', function() {
-                    const studentId = document.getElementById('student-detail-name').getAttribute('data-student-id');
-                    if (studentId) {
-                        generateStudentSummary(parseInt(studentId));
-                    }
-                });
-                
-                // Summary modal buttons
-                document.getElementById('close-summary-btn').addEventListener('click', function() {
-                    studentSummaryModal.style.display = 'none';
-                });
-                
-                document.getElementById('print-summary-btn').addEventListener('click', function() {
-                    window.print();
-                });
-                
-                document.getElementById('download-summary-btn').addEventListener('click', function() {
-                    downloadSummaryAsPDF();
-                });
-                
-                // NEW: Unit completion modal close button
-                document.getElementById('close-unit-completion-btn').addEventListener('click', function() {
-                    unitCompletionModal.style.display = 'none';
-                });
-                
-                // NEW: Analytics filter event listeners - ADD THESE
-                const analyticsCourseFilter = document.getElementById('analytics-course-filter');
-                if (analyticsCourseFilter) {
-                    analyticsCourseFilter.addEventListener('change', function() {
-                        renderAnalytics();
-                    });
+        // Setup event listeners - UPDATED VERSION
+function setupEventListeners() {
+    try {
+        // Close modals when clicking outside
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
                 }
+            });
+        });
+        
+        // Close modals when clicking close button
+        document.querySelectorAll('.close-modal').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.closest('.modal').style.display = 'none';
+            });
+        });
+        
+        // Tab switching
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
                 
-                const analyticsUnitFilter = document.getElementById('analytics-unit-filter');
-                if (analyticsUnitFilter) {
-                    analyticsUnitFilter.addEventListener('change', function() {
-                        renderAnalytics();
-                    });
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+                
+                // CRITICAL: Only render analytics when the tab is activated
+                if (tab.dataset.tab === 'analytics') {
+                    renderAnalytics();
                 }
+            });
+        });
+        
+        // Chart toggle functionality
+        document.getElementById('cards-view-btn').addEventListener('click', function() {
+            this.classList.add('active');
+            document.getElementById('charts-view-btn').classList.remove('active');
+            document.getElementById('cards-view').style.display = 'grid';
+            document.getElementById('charts-view').classList.remove('active');
+        });
+        
+        document.getElementById('charts-view-btn').addEventListener('click', function() {
+            this.classList.add('active');
+            document.getElementById('cards-view-btn').classList.remove('active');
+            document.getElementById('cards-view').style.display = 'none';
+            document.getElementById('charts-view').classList.add('active');
+            
+            // Update charts with current data
+            updateCharts();
+        });
+        
+        // Student modal
+        document.getElementById('add-student-btn').addEventListener('click', () => showStudentModal());
+        document.getElementById('cancel-student-btn').addEventListener('click', () => {
+            studentModal.style.display = 'none';
+        });
+        
+        // Student table actions
+        document.getElementById('students-table').addEventListener('click', e => {
+            if (e.target.tagName === 'BUTTON') {
+                const studentId = parseInt(e.target.getAttribute('data-student-id'));
+                const action = e.target.getAttribute('data-action');
                 
-                const analyticsTaskFilter = document.getElementById('analytics-task-filter');
-                if (analyticsTaskFilter) {
-                    analyticsTaskFilter.addEventListener('change', function() {
-                        renderAnalytics();
-                    });
+                if (action === 'edit') {
+                    showStudentModal(studentId);
+                } else if (action === 'delete') {
+                    deleteStudent(studentId);
+                } else if (action === 'view') {
+                    showStudentDetails(studentId);
                 }
-                
-                document.getElementById('student-form').addEventListener('submit', e => {
-                    e.preventDefault();
-                    
-                    try {
-                        const studentId = document.getElementById('student-id').value;
-                        const firstName = document.getElementById('student-first-name').value.trim();
-                        const lastName = document.getElementById('student-last-name').value.trim();
-                        const email = document.getElementById('student-email').value.trim();
-                        const phone = document.getElementById('student-phone').value.trim();
-                        
-                        if (!firstName || !lastName) {
-                            alert('First name and last name are required');
-                            return;
-                        }
-                        
-                        // Get selected courses
-                        const coursesSelect = document.getElementById('student-courses');
-                        const selectedCourses = Array.from(coursesSelect.selectedOptions).map(option => parseInt(option.value));
-                        
-                        // Get selected units for each course
-                        const selectedUnitsByCourse = {};
-                        document.querySelectorAll('.unit-checkbox:checked').forEach(checkbox => {
-                            const courseId = parseInt(checkbox.getAttribute('data-course-id'));
-                            const unitId = parseInt(checkbox.getAttribute('data-unit-id'));
-                            
-                            if (!selectedUnitsByCourse[courseId]) {
-                                selectedUnitsByCourse[courseId] = [];
-                            }
-                            selectedUnitsByCourse[courseId].push(unitId);
-                        });
-                        
-                        // Get start dates for rolling intake courses
-                        const startDatesByCourse = {};
-                        document.querySelectorAll('[id^="student-course-"]').forEach(input => {
-                            if (input.id.endsWith('-start-date')) {
-                                const courseId = parseInt(input.id.split('-')[2]);
-                                startDatesByCourse[courseId] = input.value;
-                            }
-                        });
-                        
-                        if (studentId) {
-                            // Update existing student
-                            const student = appData.students?.find(s => s.id === parseInt(studentId));
-                            if (!student) return;
-                            
-                            student.firstName = firstName;
-                            student.lastName = lastName;
-                            student.email = email;
-                            student.phone = phone;
-                            
-                            // Update student's courses, units, and start dates
-                            student.courses = selectedCourses.map(courseId => {
-                                const course = appData.courses?.find(c => c.id === courseId);
-                                const courseObj = {
-                                    courseId,
-                                    units: selectedUnitsByCourse[courseId] || []
-                                };
-                                
-                                // Add start date if this is a rolling intake course
-                                if (course?.rollingIntake) {
-                                    courseObj.startDate = startDatesByCourse[courseId] || new Date().toISOString().split('T')[0];
-                                }
-                                
-                                return courseObj;
-                            });
-                            
-                            // Initialize progress for new courses/units
-                            selectedCourses.forEach(courseId => {
-                                const course = appData.courses?.find(c => c.id === courseId);
-                                if (course) {
-                                    // Initialize progress for the course
-                                    if (!student.progress) student.progress = {};
-                                    if (!student.progress[courseId]) {
-                                        student.progress[courseId] = { units: {}, lastActivity: null };
-                                    }
-                                    
-                                    // Initialize unit progress for selected units
-                                    const selectedUnits = selectedUnitsByCourse[courseId] || [];
-                                    selectedUnits.forEach(unitId => {
-                                        const unit = course.units?.find(u => u.id === unitId);
-                                        if (unit && !student.progress[courseId].units?.[unitId]) {
-                                            student.progress[courseId].units[unitId] = {
-                                                completedTasks: 0,
-                                                totalTasks: unit.tasks?.length || 0
-                                            };
-                                        }
-                                    });
-                                    
-                                    // Initialize task status for selected units
-                                    if (!student.taskStatus) student.taskStatus = {};
-                                    if (!student.taskStatus[courseId]) {
-                                        student.taskStatus[courseId] = {};
-                                    }
-                                    
-                                    selectedUnits.forEach(unitId => {
-                                        const unit = course.units?.find(u => u.id === unitId);
-                                        if (unit && !student.taskStatus[courseId][unitId]) {
-                                            student.taskStatus[courseId][unitId] = {};
-                                            
-                                            unit.tasks?.forEach(task => {
-                                                student.taskStatus[courseId][unitId][task.id] = 'not-started';
-                                            });
-                                        }
-                                    });
-                                }
-                            });
-                            
-                            // Remove progress for unselected courses
-                            Object.keys(student.progress || {}).forEach(courseId => {
-                                if (!selectedCourses.includes(parseInt(courseId))) {
-                                    delete student.progress[courseId];
-                                    if (student.taskStatus) {
-                                        delete student.taskStatus[courseId];
-                                    }
-                                } else {
-                                    // Remove progress for unselected units in selected courses
-                                    const selectedUnits = selectedUnitsByCourse[courseId] || [];
-                                    Object.keys(student.progress[courseId].units || {}).forEach(unitId => {
-                                        if (!selectedUnits.includes(parseInt(unitId))) {
-                                            delete student.progress[courseId].units[unitId];
-                                            if (student.taskStatus?.[courseId]) {
-                                                delete student.taskStatus[courseId][unitId];
-                                            }
-                                        }
-                                    });
-                                }
-                            });
-                            
-                            // Log activity
-                            if (!appData.activityLog) appData.activityLog = [];
-                            appData.activityLog.unshift({
-                                date: new Date().toISOString().split('T')[0],
-                                studentId: student.id,
-                                courseId: null,
-                                activity: 'Student information updated',
-                                status: 'info'
-                            });
-                        } else {
-                            // Add new student
-                            const newId = appData.students?.length > 0 ? Math.max(...appData.students.map(s => s.id)) + 1 : 1;
-                            const newStudent = {
-                                id: newId,
-                                firstName,
-                                lastName,
-                                email,
-                                phone,
-                                courses: selectedCourses.map(courseId => {
-                                    const course = appData.courses?.find(c => c.id === courseId);
-                                    const courseObj = {
-                                        courseId,
-                                        units: selectedUnitsByCourse[courseId] || []
-                                    };
-                                    
-                                    // Add start date if this is a rolling intake course
-                                    if (course?.rollingIntake) {
-                                        courseObj.startDate = startDatesByCourse[courseId] || new Date().toISOString().split('T')[0];
-                                    }
-                                    
-                                    return courseObj;
-                                }),
-                                progress: {},
-                                taskStatus: {}
-                            };
-                            
-                            // Initialize progress for each course and selected units
-                            selectedCourses.forEach(courseId => {
-                                const course = appData.courses?.find(c => c.id === courseId);
-                                if (course) {
-                                    newStudent.progress[courseId] = { units: {}, lastActivity: null };
-                                    newStudent.taskStatus[courseId] = {};
-                                    
-                                    // Initialize unit progress for selected units
-                                    const selectedUnits = selectedUnitsByCourse[courseId] || [];
-                                    selectedUnits.forEach(unitId => {
-                                        const unit = course.units?.find(u => u.id === unitId);
-                                        if (unit) {
-                                            newStudent.progress[courseId].units[unitId] = {
-                                                completedTasks: 0,
-                                                totalTasks: unit.tasks?.length || 0
-                                            };
-                                            
-                                            // Initialize task status
-                                            newStudent.taskStatus[courseId][unitId] = {};
-                                            unit.tasks?.forEach(task => {
-                                                newStudent.taskStatus[courseId][unitId][task.id] = 'not-started';
-                                            });
-                                        }
-                                    });
-                                }
-                            });
-                            
-                            if (!appData.students) appData.students = [];
-                            appData.students.push(newStudent);
-                            
-                            // Log activity
-                            if (!appData.activityLog) appData.activityLog = [];
-                            appData.activityLog.unshift({
-                                date: new Date().toISOString().split('T')[0],
-                                studentId: newStudent.id,
-                                courseId: null,
-                                activity: 'Student added to system',
-                                status: 'info'
-                            });
-                        }
-                        
-                        saveData();
-                        studentModal.style.display = 'none';
-                        renderStudents();
-                        renderDashboard();
-                        renderRecentActivity();
-                        renderAnalytics();
-                    } catch (e) {
-                        console.error('Error saving student:', e);
-                        alert('Error saving student');
-                    }
-                });
-                
-                // Course modal
-                document.getElementById('add-course-btn').addEventListener('click', () => showCourseModal());
-                document.getElementById('cancel-course-btn').addEventListener('click', () => {
-                    courseModal.style.display = 'none';
-                });
-                
-                // Course table actions
-                coursesTable.addEventListener('click', e => {
-                    if (e.target.tagName === 'BUTTON') {
-                        const courseId = parseInt(e.target.getAttribute('data-course-id'));
-                        const action = e.target.getAttribute('data-action');
-                        
-                        if (action === 'edit') {
-                            showCourseModal(courseId);
-                        } else if (action === 'delete') {
-                            deleteCourse(courseId);
-                        } else if (action === 'units') {
-                            showCourseUnits(courseId);
-                        }
-                    }
-                });
-                
-                document.getElementById('course-form').addEventListener('submit', e => {
-                    e.preventDefault();
-                    
-                    try {
-                        const courseId = document.getElementById('course-id').value;
-                        const code = document.getElementById('course-code').value.trim();
-                        const name = document.getElementById('course-name').value.trim();
-                        const duration = parseInt(document.getElementById('course-duration').value);
-                        const startDate = document.getElementById('course-start-date').value;
-                        const rollingIntake = document.getElementById('course-rolling-intake').checked;
-                        const description = document.getElementById('course-description').value.trim();
-                        
-                        if (!code || !name || isNaN(duration)) {
-                            alert('Course code, name, and duration are required');
-                            return;
-                        }
-                        
-                        if (courseId) {
-                            // Update existing course
-                            const course = appData.courses?.find(c => c.id === parseInt(courseId));
-                            if (course) {
-                                course.code = code;
-                                course.name = name;
-                                course.duration = duration;
-                                course.startDate = rollingIntake ? null : startDate;
-                                course.rollingIntake = rollingIntake;
-                                course.description = description;
-                            }
-                        } else {
-                            // Add new course
-                            const newCourse = {
-                                id: appData.courses?.length > 0 ? Math.max(...appData.courses.map(c => c.id)) + 1 : 1,
-                                code,
-                                name,
-                                duration,
-                                startDate: rollingIntake ? null : startDate,
-                                rollingIntake,
-                                description,
-                                units: []
-                            };
-                            
-                            if (!appData.courses) appData.courses = [];
-                            appData.courses.push(newCourse);
-                        }
-                        
-                        saveData();
-                        courseModal.style.display = 'none';
-                        renderCourses();
-                        renderStudents();
-                        renderDashboard();
-                        renderAnalytics();
-                    } catch (e) {
-                        console.error('Error saving course:', e);
-                        alert('Error saving course');
-                    }
-                });
-                
-                // Unit modal
-                document.getElementById('cancel-unit-btn').addEventListener('click', () => {
-                    unitModal.style.display = 'none';
-                });
-                
-                document.getElementById('unit-form').addEventListener('submit', e => {
-                    e.preventDefault();
-                    
-                    try {
-                        const unitId = document.getElementById('unit-id').value;
-                        const courseId = parseInt(document.getElementById('unit-course-id').value);
-                        const code = document.getElementById('unit-code').value.trim();
-                        const name = document.getElementById('unit-name').value.trim();
-                        const description = document.getElementById('unit-description').value.trim();
-                        const order = parseInt(document.getElementById('unit-order').value);
-                        
-                        if (!code || !name || isNaN(order)) {
-                            alert('Unit code, name, and order are required');
-                            return;
-                        }
-                        
-                        // Get tasks from form
-                        const taskInputs = document.querySelectorAll('#task-fields input');
-                        const tasks = Array.from(taskInputs).map((input, index) => ({
-                            id: index + 1,
-                            name: input.value.trim()
-                        })).filter(task => task.name); // Remove empty tasks
-                        
-                        const course = appData.courses?.find(c => c.id === courseId);
-                        if (!course) return;
-                        
-                        if (unitId) {
-                            // Update existing unit
-                            const unit = course.units?.find(u => u.id === parseInt(unitId));
-                            if (unit) {
-                                unit.code = code;
-                                unit.name = name;
-                                unit.description = description;
-                                unit.order = order;
-                                unit.tasks = tasks;
-                                
-                                // Update student progress to reflect task changes
-                                appData.students?.forEach(student => {
-                                    if (student.courses?.some(c => c.courseId === courseId) && student.progress?.[courseId]) {
-                                        // Update unit progress
-                                        if (student.progress[courseId].units?.[unit.id]) {
-                                            student.progress[courseId].units[unit.id].totalTasks = tasks.length;
-                                            
-                                            // If student had completed more tasks than now exist, adjust completed count
-                                            if (student.progress[courseId].units[unit.id].completedTasks > tasks.length) {
-                                                student.progress[courseId].units[unit.id].completedTasks = tasks.length;
-                                            }
-                                        }
-                                        
-                                        // Update task status
-                                        if (student.taskStatus?.[courseId]?.[unit.id]) {
-                                            // Keep only statuses for tasks that still exist
-                                            const newTaskStatus = {};
-                                            tasks.forEach((task, index) => {
-                                                const oldTaskId = parseInt(taskInputs[index].getAttribute('data-task-id')) || task.id;
-                                                newTaskStatus[task.id] = student.taskStatus[courseId][unit.id][oldTaskId] || 'not-started';
-                                            });
-                                            student.taskStatus[courseId][unit.id] = newTaskStatus;
-                                        }
-                                    }
-                                });
-                            }
-                        } else {
-                            // Add new unit
-                            const newUnit = {
-                                id: course.units?.length > 0 ? Math.max(...course.units.map(u => u.id)) + 1 : 1,
-                                code,
-                                name,
-                                description,
-                                order,
-                                tasks
-                            };
-                            
-                            if (!course.units) course.units = [];
-                            course.units.push(newUnit);
-                            
-                            // Update student progress for students enrolled in this course and unit
-                            appData.students?.forEach(student => {
-                                const courseObj = student.courses?.find(c => c.courseId === courseId);
-                                if (courseObj && courseObj.units?.includes(newUnit.id)) {
-                                    // Initialize progress for this unit
-                                    if (!student.progress) student.progress = {};
-                                    if (!student.progress[courseId]) {
-                                        student.progress[courseId] = { units: {}, lastActivity: null };
-                                    }
-                                    
-                                    student.progress[courseId].units[newUnit.id] = {
-                                        completedTasks: 0,
-                                        totalTasks: tasks.length
-                                    };
-                                    
-                                    // Initialize task status for this unit
-                                    if (!student.taskStatus) student.taskStatus = {};
-                                    if (!student.taskStatus[courseId]) {
-                                        student.taskStatus[courseId] = {};
-                                    }
-                                    
-                                    student.taskStatus[courseId][newUnit.id] = {};
-                                    tasks.forEach(task => {
-                                        student.taskStatus[courseId][newUnit.id][task.id] = 'not-started';
-                                    });
-                                }
-                            });
-                        }
-                        
-                        saveData();
-                        unitModal.style.display = 'none';
-                        showCourseUnits(courseId);
-                        renderStudents();
-                        renderDashboard();
-                        renderAnalytics();
-                    } catch (e) {
-                        console.error('Error saving unit:', e);
-                        alert('Error saving unit');
-                    }
-                });
-                
-                // Student detail modal
-                document.getElementById('close-student-detail-btn').addEventListener('click', () => {
-                    studentDetailModal.style.display = 'none';
-                });
-                
-                // Search and filter
-                document.getElementById('student-search').addEventListener('input', e => {
-                    renderStudents(e.target.value);
-                });
-                
-                document.getElementById('course-filter').addEventListener('change', () => {
-                    renderStudents(document.getElementById('student-search').value);
-                });
-                
-                document.getElementById('status-filter').addEventListener('change', () => {
-                    renderStudents(document.getElementById('student-search').value);
-                });
-                
-                // Settings
-                colorThemeSelect.addEventListener('change', function() {
-                    if (this.value === 'custom') {
-                        customColorsSection.style.display = 'block';
-                    } else {
-                        customColorsSection.style.display = 'none';
-                        appData.settings.theme = this.value;
-                        applyTheme();
-                    }
-                });
-                
-                document.getElementById('custom-primary').addEventListener('input', function() {
-                    if (!appData.settings.colors) appData.settings.colors = {};
-                    appData.settings.colors.primary = this.value;
-                    applyTheme();
-                });
-                
-                document.getElementById('custom-secondary').addEventListener('input', function() {
-                    if (!appData.settings.colors) appData.settings.colors = {};
-                    appData.settings.colors.secondary = this.value;
-                    applyTheme();
-                });
-                
-                document.getElementById('custom-accent').addEventListener('input', function() {
-                    if (!appData.settings.colors) appData.settings.colors = {};
-                    appData.settings.colors.accent = this.value;
-                    applyTheme();
-                });
-                
-                document.getElementById('save-settings-btn').addEventListener('click', function() {
-                    try {
-                        appData.settings.institutionName = document.getElementById('institution-name').value;
-                        appData.settings.theme = document.getElementById('color-theme').value;
-                        
-                        if (appData.settings.theme === 'custom') {
-                            appData.settings.colors = {
-                                primary: document.getElementById('custom-primary').value,
-                                secondary: document.getElementById('custom-secondary').value,
-                                accent: document.getElementById('custom-accent').value
-                            };
-                        }
-                        
-                        saveData();
-                        alert('Settings saved successfully!');
-                    } catch (e) {
-                        console.error('Error saving settings:', e);
-                        alert('Error saving settings');
-                    }
-                });
-                
-                // Data export/import
-                document.getElementById('export-data-btn').addEventListener('click', function() {
-                    try {
-                        const dataStr = JSON.stringify(appData, null, 2);
-                        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-                        
-                        const exportFileDefaultName = `vocational-progress-tracker-${new Date().toISOString().split('T')[0]}.json`;
-                        
-                        const linkElement = document.createElement('a');
-                        linkElement.setAttribute('href', dataUri);
-                        linkElement.setAttribute('download', exportFileDefaultName);
-                        linkElement.click();
-                    } catch (e) {
-                        console.error('Error exporting data:', e);
-                        alert('Error exporting data');
-                    }
-                });
-                
-                document.getElementById('import-data-btn').addEventListener('click', function() {
-                    document.getElementById('import-file').click();
-                });
-                
-                document.getElementById('import-file').addEventListener('change', function(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    
-                    if (confirm('Importing data will overwrite all current data. Are you sure you want to continue?')) {
-                        const reader = new FileReader();
-                        reader.onload = function(e) {
-                            try {
-                                const importedData = JSON.parse(e.target.result);
-                                if (importedData && 
-                                    typeof importedData === 'object' && 
-                                    importedData.settings && 
-                                    importedData.students && 
-                                    importedData.courses && 
-                                    importedData.activityLog) {
-                                    appData = importedData;
-                                    saveData();
-                                    loadSettings();
-                                    renderDashboard();
-                                    renderStudents();
-                                    renderCourses();
-                                    renderRecentActivity();
-                                    renderAnalytics();
-                                    alert('Data imported successfully!');
-                                } else {
-                                    alert('Invalid data format. Import failed.');
-                                }
-                            } catch (error) {
-                                console.error('Error importing data:', error);
-                                alert('Error importing data: ' + error.message);
-                            }
-                        };
-                        reader.onerror = function() {
-                            alert('Error reading file');
-                        };
-                        reader.readAsText(file);
-                    }
-                    
-                    // Reset file input
-                    e.target.value = '';
-                });
-                
-                // Generate report
-                document.getElementById('generate-report-btn').addEventListener('click', generateReport);
-            } catch (e) {
-                console.error('Error setting up event listeners:', e);
             }
-        }
+        });
+        
+        // Generate summary button
+        document.getElementById('generate-summary-btn').addEventListener('click', function() {
+            const studentId = document.getElementById('student-detail-name').getAttribute('data-student-id');
+            if (studentId) {
+                generateStudentSummary(parseInt(studentId));
+            }
+        });
+        
+        // Summary modal buttons
+        document.getElementById('close-summary-btn').addEventListener('click', function() {
+            studentSummaryModal.style.display = 'none';
+        });
+        
+        document.getElementById('print-summary-btn').addEventListener('click', function() {
+            window.print();
+        });
+        
+        document.getElementById('download-summary-btn').addEventListener('click', function() {
+            downloadSummaryAsPDF();
+        });
+        
+        // NEW: Unit completion modal close button
+        document.getElementById('close-unit-completion-btn').addEventListener('click', function() {
+            unitCompletionModal.style.display = 'none';
+        });
+        
+        // NEW: Analytics filter event listeners - FIXED (Event Delegation Approach)
+        document.addEventListener('change', function(e) {
+            if (e.target.id === 'analytics-course-filter' || 
+                e.target.id === 'analytics-unit-filter' || 
+                e.target.id === 'analytics-task-filter') {
+                renderAnalytics();
+            }
+        });
+        
+        document.getElementById('student-form').addEventListener('submit', e => {
+            e.preventDefault();
+            
+            try {
+                const studentId = document.getElementById('student-id').value;
+                const firstName = document.getElementById('student-first-name').value.trim();
+                const lastName = document.getElementById('student-last-name').value.trim();
+                const email = document.getElementById('student-email').value.trim();
+                const phone = document.getElementById('student-phone').value.trim();
+                
+                if (!firstName || !lastName) {
+                    alert('First name and last name are required');
+                    return;
+                }
+                
+                // Get selected courses
+                const coursesSelect = document.getElementById('student-courses');
+                const selectedCourses = Array.from(coursesSelect.selectedOptions).map(option => parseInt(option.value));
+                
+                // Get selected units for each course
+                const selectedUnitsByCourse = {};
+                document.querySelectorAll('.unit-checkbox:checked').forEach(checkbox => {
+                    const courseId = parseInt(checkbox.getAttribute('data-course-id'));
+                    const unitId = parseInt(checkbox.getAttribute('data-unit-id'));
+                    
+                    if (!selectedUnitsByCourse[courseId]) {
+                        selectedUnitsByCourse[courseId] = [];
+                    }
+                    selectedUnitsByCourse[courseId].push(unitId);
+                });
+                
+                // Get start dates for rolling intake courses
+                const startDatesByCourse = {};
+                document.querySelectorAll('[id^="student-course-"]').forEach(input => {
+                    if (input.id.endsWith('-start-date')) {
+                        const courseId = parseInt(input.id.split('-')[2]);
+                        startDatesByCourse[courseId] = input.value;
+                    }
+                });
+                
+                if (studentId) {
+                    // Update existing student
+                    const student = appData.students?.find(s => s.id === parseInt(studentId));
+                    if (!student) return;
+                    
+                    student.firstName = firstName;
+                    student.lastName = lastName;
+                    student.email = email;
+                    student.phone = phone;
+                    
+                    // Update student's courses, units, and start dates
+                    student.courses = selectedCourses.map(courseId => {
+                        const course = appData.courses?.find(c => c.id === courseId);
+                        const courseObj = {
+                            courseId,
+                            units: selectedUnitsByCourse[courseId] || []
+                        };
+                        
+                        // Add start date if this is a rolling intake course
+                        if (course?.rollingIntake) {
+                            courseObj.startDate = startDatesByCourse[courseId] || new Date().toISOString().split('T')[0];
+                        }
+                        
+                        return courseObj;
+                    });
+                    
+                    // Initialize progress for new courses/units
+                    selectedCourses.forEach(courseId => {
+                        const course = appData.courses?.find(c => c.id === courseId);
+                        if (course) {
+                            // Initialize progress for the course
+                            if (!student.progress) student.progress = {};
+                            if (!student.progress[courseId]) {
+                                student.progress[courseId] = { units: {}, lastActivity: null };
+                            }
+                            
+                            // Initialize unit progress for selected units
+                            const selectedUnits = selectedUnitsByCourse[courseId] || [];
+                            selectedUnits.forEach(unitId => {
+                                const unit = course.units?.find(u => u.id === unitId);
+                                if (unit && !student.progress[courseId].units?.[unitId]) {
+                                    student.progress[courseId].units[unitId] = {
+                                        completedTasks: 0,
+                                        totalTasks: unit.tasks?.length || 0
+                                    };
+                                }
+                            });
+                            
+                            // Initialize task status for selected units
+                            if (!student.taskStatus) student.taskStatus = {};
+                            if (!student.taskStatus[courseId]) {
+                                student.taskStatus[courseId] = {};
+                            }
+                            
+                            selectedUnits.forEach(unitId => {
+                                const unit = course.units?.find(u => u.id === unitId);
+                                if (unit && !student.taskStatus[courseId][unitId]) {
+                                    student.taskStatus[courseId][unitId] = {};
+                                    
+                                    unit.tasks?.forEach(task => {
+                                        student.taskStatus[courseId][unitId][task.id] = 'not-started';
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    
+                    // Remove progress for unselected courses
+                    Object.keys(student.progress || {}).forEach(courseId => {
+                        if (!selectedCourses.includes(parseInt(courseId))) {
+                            delete student.progress[courseId];
+                            if (student.taskStatus) {
+                                delete student.taskStatus[courseId];
+                            }
+                        } else {
+                            // Remove progress for unselected units in selected courses
+                            const selectedUnits = selectedUnitsByCourse[courseId] || [];
+                            Object.keys(student.progress[courseId].units || {}).forEach(unitId => {
+                                if (!selectedUnits.includes(parseInt(unitId))) {
+                                    delete student.progress[courseId].units[unitId];
+                                    if (student.taskStatus?.[courseId]) {
+                                        delete student.taskStatus[courseId][unitId];
+                                    }
+                                }
+                            });
+                        }
+                    });
+                    
+                    // Log activity
+                    if (!appData.activityLog) appData.activityLog = [];
+                    appData.activityLog.unshift({
+                        date: new Date().toISOString().split('T')[0],
+                        studentId: student.id,
+                        courseId: null,
+                        activity: 'Student information updated',
+                        status: 'info'
+                    });
+                } else {
+                    // Add new student
+                    const newId = appData.students?.length > 0 ? Math.max(...appData.students.map(s => s.id)) + 1 : 1;
+                    const newStudent = {
+                        id: newId,
+                        firstName,
+                        lastName,
+                        email,
+                        phone,
+                        courses: selectedCourses.map(courseId => {
+                            const course = appData.courses?.find(c => c.id === courseId);
+                            const courseObj = {
+                                courseId,
+                                units: selectedUnitsByCourse[courseId] || []
+                            };
+                            
+                            // Add start date if this is a rolling intake course
+                            if (course?.rollingIntake) {
+                                courseObj.startDate = startDatesByCourse[courseId] || new Date().toISOString().split('T')[0];
+                            }
+                            
+                            return courseObj;
+                        }),
+                        progress: {},
+                        taskStatus: {}
+                    };
+                    
+                    // Initialize progress for each course and selected units
+                    selectedCourses.forEach(courseId => {
+                        const course = appData.courses?.find(c => c.id === courseId);
+                        if (course) {
+                            newStudent.progress[courseId] = { units: {}, lastActivity: null };
+                            newStudent.taskStatus[courseId] = {};
+                            
+                            // Initialize unit progress for selected units
+                            const selectedUnits = selectedUnitsByCourse[courseId] || [];
+                            selectedUnits.forEach(unitId => {
+                                const unit = course.units?.find(u => u.id === unitId);
+                                if (unit) {
+                                    newStudent.progress[courseId].units[unitId] = {
+                                        completedTasks: 0,
+                                        totalTasks: unit.tasks?.length || 0
+                                    };
+                                    
+                                    // Initialize task status
+                                    newStudent.taskStatus[courseId][unitId] = {};
+                                    unit.tasks?.forEach(task => {
+                                        newStudent.taskStatus[courseId][unitId][task.id] = 'not-started';
+                                    });
+                                }
+                            });
+                        }
+                    });
+                    
+                    if (!appData.students) appData.students = [];
+                    appData.students.push(newStudent);
+                    
+                    // Log activity
+                    if (!appData.activityLog) appData.activityLog = [];
+                    appData.activityLog.unshift({
+                        date: new Date().toISOString().split('T')[0],
+                        studentId: newStudent.id,
+                        courseId: null,
+                        activity: 'Student added to system',
+                        status: 'info'
+                    });
+                }
+                
+                saveData();
+                studentModal.style.display = 'none';
+                renderStudents();
+                renderDashboard();
+                renderRecentActivity();
+                renderAnalytics();
+            } catch (e) {
+                console.error('Error saving student:', e);
+                alert('Error saving student');
+            }
+        });
+        
+        // Course modal
+        document.getElementById('add-course-btn').addEventListener('click', () => showCourseModal());
+        document.getElementById('cancel-course-btn').addEventListener('click', () => {
+            courseModal.style.display = 'none';
+        });
+        
+        // Course table actions
+        coursesTable.addEventListener('click', e => {
+            if (e.target.tagName === 'BUTTON') {
+                const courseId = parseInt(e.target.getAttribute('data-course-id'));
+                const action = e.target.getAttribute('data-action');
+                
+                if (action === 'edit') {
+                    showCourseModal(courseId);
+                } else if (action === 'delete') {
+                    deleteCourse(courseId);
+                } else if (action === 'units') {
+                    showCourseUnits(courseId);
+                }
+            }
+        });
+        
+        document.getElementById('course-form').addEventListener('submit', e => {
+            e.preventDefault();
+            
+            try {
+                const courseId = document.getElementById('course-id').value;
+                const code = document.getElementById('course-code').value.trim();
+                const name = document.getElementById('course-name').value.trim();
+                const duration = parseInt(document.getElementById('course-duration').value);
+                const startDate = document.getElementById('course-start-date').value;
+                const rollingIntake = document.getElementById('course-rolling-intake').checked;
+                const description = document.getElementById('course-description').value.trim();
+                
+                if (!code || !name || isNaN(duration)) {
+                    alert('Course code, name, and duration are required');
+                    return;
+                }
+                
+                if (courseId) {
+                    // Update existing course
+                    const course = appData.courses?.find(c => c.id === parseInt(courseId));
+                    if (course) {
+                        course.code = code;
+                        course.name = name;
+                        course.duration = duration;
+                        course.startDate = rollingIntake ? null : startDate;
+                        course.rollingIntake = rollingIntake;
+                        course.description = description;
+                    }
+                } else {
+                    // Add new course
+                    const newCourse = {
+                        id: appData.courses?.length > 0 ? Math.max(...appData.courses.map(c => c.id)) + 1 : 1,
+                        code,
+                        name,
+                        duration,
+                        startDate: rollingIntake ? null : startDate,
+                        rollingIntake,
+                        description,
+                        units: []
+                    };
+                    
+                    if (!appData.courses) appData.courses = [];
+                    appData.courses.push(newCourse);
+                }
+                
+                saveData();
+                courseModal.style.display = 'none';
+                renderCourses();
+                renderStudents();
+                renderDashboard();
+                renderAnalytics();
+            } catch (e) {
+                console.error('Error saving course:', e);
+                alert('Error saving course');
+            }
+        });
+        
+        // Unit modal
+        document.getElementById('cancel-unit-btn').addEventListener('click', () => {
+            unitModal.style.display = 'none';
+        });
+        
+        document.getElementById('unit-form').addEventListener('submit', e => {
+            e.preventDefault();
+            
+            try {
+                const unitId = document.getElementById('unit-id').value;
+                const courseId = parseInt(document.getElementById('unit-course-id').value);
+                const code = document.getElementById('unit-code').value.trim();
+                const name = document.getElementById('unit-name').value.trim();
+                const description = document.getElementById('unit-description').value.trim();
+                const order = parseInt(document.getElementById('unit-order').value);
+                
+                if (!code || !name || isNaN(order)) {
+                    alert('Unit code, name, and order are required');
+                    return;
+                }
+                
+                // Get tasks from form
+                const taskInputs = document.querySelectorAll('#task-fields input');
+                const tasks = Array.from(taskInputs).map((input, index) => ({
+                    id: index + 1,
+                    name: input.value.trim()
+                })).filter(task => task.name); // Remove empty tasks
+                
+                const course = appData.courses?.find(c => c.id === courseId);
+                if (!course) return;
+                
+                if (unitId) {
+                    // Update existing unit
+                    const unit = course.units?.find(u => u.id === parseInt(unitId));
+                    if (unit) {
+                        unit.code = code;
+                        unit.name = name;
+                        unit.description = description;
+                        unit.order = order;
+                        unit.tasks = tasks;
+                        
+                        // Update student progress to reflect task changes
+                        appData.students?.forEach(student => {
+                            if (student.courses?.some(c => c.courseId === courseId) && student.progress?.[courseId]) {
+                                // Update unit progress
+                                if (student.progress[courseId].units?.[unit.id]) {
+                                    student.progress[courseId].units[unit.id].totalTasks = tasks.length;
+                                    
+                                    // If student had completed more tasks than now exist, adjust completed count
+                                    if (student.progress[courseId].units[unit.id].completedTasks > tasks.length) {
+                                        student.progress[courseId].units[unit.id].completedTasks = tasks.length;
+                                    }
+                                }
+                                
+                                // Update task status
+                                if (student.taskStatus?.[courseId]?.[unit.id]) {
+                                    // Keep only statuses for tasks that still exist
+                                    const newTaskStatus = {};
+                                    tasks.forEach((task, index) => {
+                                        const oldTaskId = parseInt(taskInputs[index].getAttribute('data-task-id')) || task.id;
+                                        newTaskStatus[task.id] = student.taskStatus[courseId][unit.id][oldTaskId] || 'not-started';
+                                    });
+                                    student.taskStatus[courseId][unit.id] = newTaskStatus;
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    // Add new unit
+                    const newUnit = {
+                        id: course.units?.length > 0 ? Math.max(...course.units.map(u => u.id)) + 1 : 1,
+                        code,
+                        name,
+                        description,
+                        order,
+                        tasks
+                    };
+                    
+                    if (!course.units) course.units = [];
+                    course.units.push(newUnit);
+                    
+                    // Update student progress for students enrolled in this course and unit
+                    appData.students?.forEach(student => {
+                        const courseObj = student.courses?.find(c => c.courseId === courseId);
+                        if (courseObj && courseObj.units?.includes(newUnit.id)) {
+                            // Initialize progress for this unit
+                            if (!student.progress) student.progress = {};
+                            if (!student.progress[courseId]) {
+                                student.progress[courseId] = { units: {}, lastActivity: null };
+                            }
+                            
+                            student.progress[courseId].units[newUnit.id] = {
+                                completedTasks: 0,
+                                totalTasks: tasks.length
+                            };
+                            
+                            // Initialize task status for this unit
+                            if (!student.taskStatus) student.taskStatus = {};
+                            if (!student.taskStatus[courseId]) {
+                                student.taskStatus[courseId] = {};
+                            }
+                            
+                            student.taskStatus[courseId][newUnit.id] = {};
+                            tasks.forEach(task => {
+                                student.taskStatus[courseId][newUnit.id][task.id] = 'not-started';
+                            });
+                        }
+                    });
+                }
+                
+                saveData();
+                unitModal.style.display = 'none';
+                showCourseUnits(courseId);
+                renderStudents();
+                renderDashboard();
+                renderAnalytics();
+            } catch (e) {
+                console.error('Error saving unit:', e);
+                alert('Error saving unit');
+            }
+        });
+        
+        // Student detail modal
+        document.getElementById('close-student-detail-btn').addEventListener('click', () => {
+            studentDetailModal.style.display = 'none';
+        });
+        
+        // Search and filter
+        document.getElementById('student-search').addEventListener('input', e => {
+            renderStudents(e.target.value);
+        });
+        
+        document.getElementById('course-filter').addEventListener('change', () => {
+            renderStudents(document.getElementById('student-search').value);
+        });
+        
+        document.getElementById('status-filter').addEventListener('change', () => {
+            renderStudents(document.getElementById('student-search').value);
+        });
+        
+        // Settings
+        colorThemeSelect.addEventListener('change', function() {
+            if (this.value === 'custom') {
+                customColorsSection.style.display = 'block';
+            } else {
+                customColorsSection.style.display = 'none';
+                appData.settings.theme = this.value;
+                applyTheme();
+            }
+        });
+        
+        document.getElementById('custom-primary').addEventListener('input', function() {
+            if (!appData.settings.colors) appData.settings.colors = {};
+            appData.settings.colors.primary = this.value;
+            applyTheme();
+        });
+        
+        document.getElementById('custom-secondary').addEventListener('input', function() {
+            if (!appData.settings.colors) appData.settings.colors = {};
+            appData.settings.colors.secondary = this.value;
+            applyTheme();
+        });
+        
+        document.getElementById('custom-accent').addEventListener('input', function() {
+            if (!appData.settings.colors) appData.settings.colors = {};
+            appData.settings.colors.accent = this.value;
+            applyTheme();
+        });
+        
+        document.getElementById('save-settings-btn').addEventListener('click', function() {
+            try {
+                appData.settings.institutionName = document.getElementById('institution-name').value;
+                appData.settings.theme = document.getElementById('color-theme').value;
+                
+                if (appData.settings.theme === 'custom') {
+                    appData.settings.colors = {
+                        primary: document.getElementById('custom-primary').value,
+                        secondary: document.getElementById('custom-secondary').value,
+                        accent: document.getElementById('custom-accent').value
+                    };
+                }
+                
+                saveData();
+                alert('Settings saved successfully!');
+            } catch (e) {
+                console.error('Error saving settings:', e);
+                alert('Error saving settings');
+            }
+        });
+        
+        // Data export/import
+        document.getElementById('export-data-btn').addEventListener('click', function() {
+            try {
+                const dataStr = JSON.stringify(appData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const exportFileDefaultName = `vocational-progress-tracker-${new Date().toISOString().split('T')[0]}.json`;
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            } catch (e) {
+                console.error('Error exporting data:', e);
+                alert('Error exporting data');
+            }
+        });
+        
+        document.getElementById('import-data-btn').addEventListener('click', function() {
+            document.getElementById('import-file').click();
+        });
+        
+        document.getElementById('import-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            if (confirm('Importing data will overwrite all current data. Are you sure you want to continue?')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (importedData && 
+                            typeof importedData === 'object' && 
+                            importedData.settings && 
+                            importedData.students && 
+                            importedData.courses && 
+                            importedData.activityLog) {
+                            appData = importedData;
+                            saveData();
+                            loadSettings();
+                            renderDashboard();
+                            renderStudents();
+                            renderCourses();
+                            renderRecentActivity();
+                            renderAnalytics();
+                            alert('Data imported successfully!');
+                        } else {
+                            alert('Invalid data format. Import failed.');
+                        }
+                    } catch (error) {
+                        console.error('Error importing data:', error);
+                        alert('Error importing data: ' + error.message);
+                    }
+                };
+                reader.onerror = function() {
+                    alert('Error reading file');
+                };
+                reader.readAsText(file);
+            }
+            
+            // Reset file input
+            e.target.value = '';
+        });
+        
+        // Generate report
+        document.getElementById('generate-report-btn').addEventListener('click', generateReport);
+    } catch (e) {
+        console.error('Error setting up event listeners:', e);
+    }
+}
         
         // Initialize the application
         document.addEventListener('DOMContentLoaded', initApp);
